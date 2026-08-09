@@ -1,0 +1,27 @@
+# Dependencies & Virtual Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Node & Next.js
+node_modules/
+dashboard/node_modules/
+.next/
+dashboard/.next/
+out/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*
+!.env.example
+!backend/.env.example
+!dashboard/.env.example
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+*.log
