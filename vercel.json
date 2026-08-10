@@ -1,11 +1,9 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/dashboard/api/$1" },
     { "source": "/(.*)", "destination": "/dashboard/$1" }
   ],
   "builds": [
-    { "src": "dashboard", "use": "@vercel/next" },
-    { "src": "backend/app/main.py", "use": "@vercel/python" }
+    { "src": "dashboard", "use": "@vercel/next" }
   ]
 }
