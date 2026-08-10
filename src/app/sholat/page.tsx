@@ -349,7 +349,7 @@ export default function PrayerAssistant() {
                   <p className="font-bold">Sensor Deteksi Sholat Terputus / Backend Offline</p>
                   <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
                     {typeof window !== "undefined" && window.location.protocol === "https:" && apiUrl.startsWith("http://")
-                      ? `Website disajikan via HTTPS (Firebase Hosting), sehingga browser memblokir koneksi HTTP ke ${apiUrl} (Mixed Content Security Block).`
+                      ? `Website disajikan via HTTPS (Vercel), sehingga browser memblokir koneksi HTTP ke ${apiUrl} (Mixed Content). Gunakan ngrok atau host backend di server HTTPS.`
                       : `Gagal terhubung ke URL backend: ${apiUrl}. Pastikan server Python FastAPI berjalan.`}
                   </p>
                 </div>

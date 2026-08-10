@@ -370,7 +370,7 @@ export default function ModestDressCheck() {
                 <p className="font-bold">Sensor Deteksi Backend Terputus / Tidak Terjangkau</p>
                 <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
                   {typeof window !== "undefined" && window.location.protocol === "https:" && apiUrl.startsWith("http://")
-                    ? `Situs disajikan via HTTPS (Firebase Hosting), sehingga browser memblokir koneksi HTTP ke ${apiUrl} (Mixed Content Security Block).`
+                    ? `Situs disajikan via HTTPS (Vercel), sehingga browser memblokir koneksi HTTP ke ${apiUrl} (Mixed Content). Gunakan ngrok atau host backend di server HTTPS.`
                     : `Gagal terhubung ke URL backend: ${apiUrl}. Pastikan server Python FastAPI (MediaPipe) sedang berjalan.`}
                 </p>
               </div>
@@ -531,8 +531,8 @@ export default function ModestDressCheck() {
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Fitur deteksi aurat &amp; rakaat sholat memerlukan server backend Python (FastAPI + MediaPipe).
-              Saat di-host di Firebase (HTTPS), browser memblokir koneksi HTTP ke <code>localhost</code>.
+              Fitur deteksi aurat &amp; rakaat sholat memerlukan server backend Python (FastAPI + MediaPipe) yang berjalan di komputer lokal atau server terpisah.
+              Saat website di-host di Vercel (HTTPS), browser memblokir koneksi HTTP ke <code>localhost</code>. Gunakan ngrok untuk membuat tunnel HTTPS.
             </p>
 
             <div className="space-y-1.5">
