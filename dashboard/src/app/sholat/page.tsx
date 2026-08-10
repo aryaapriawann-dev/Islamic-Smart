@@ -56,7 +56,7 @@ export default function PrayerAssistant() {
   const [backendError, setBackendError] = useState(false);
 
   // API Base Configuration with localStorage support
-  const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API_BASE);
+  const [apiUrl, setApiUrl] = useState<string>(API_BASE);
   const [showApiModal, setShowApiModal] = useState<boolean>(false);
   const [customUrlInput, setCustomUrlInput] = useState<string>("");
 
@@ -66,7 +66,7 @@ export default function PrayerAssistant() {
       setApiUrl(savedUrl);
       setCustomUrlInput(savedUrl);
     } else {
-      setCustomUrlInput(DEFAULT_API_BASE);
+      setCustomUrlInput(API_BASE);
     }
   }, []);
 
