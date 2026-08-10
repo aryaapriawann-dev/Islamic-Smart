@@ -287,36 +287,37 @@ export default function ModestDressCheck() {
   const startCamera = useCallback(
     async (targetFacingMode?: "user" | "environment") => {
       if (emergencyOff) return;
-      setCameraError(null);
-      const modeToUse = targetFacingMode || facingMode;
-
+      
       stopCamera();
 
+      const modeToUse = targetFacingMode || facingMode;
+      const constraints = {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: { ideal: modeToUse }
+        },
+        audio: false,
+      };
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: modeToUse } },
-          audio: false,
-        });
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          await videoRef.current.play();
           setIsCameraActive(true);
         }
       } catch (err) {
-        console.warn("Target camera mode failed, trying fallback:", err);
+        console.warn("Kamera gagal, mencoba fallback:", err);
         try {
-          const fallbackStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          });
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
           if (videoRef.current) {
             videoRef.current.srcObject = fallbackStream;
-            videoRef.current.play();
+            await videoRef.current.play();
             setIsCameraActive(true);
           }
         } catch (fallbackErr) {
           console.error("Camera access error:", fallbackErr);
-          setCameraError("Kamera/CCTV tidak dapat diakses atau izin ditolak.");
           setIsCameraActive(false);
         }
       }
