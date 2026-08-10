@@ -1,12 +1,7 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "dashboard/package.json", "use": "@vercel/next" },
-    { "src": "backend/app/main.py", "use": "@vercel/python" }
-  ],
-  "routes": [
-    { "src": "/detect/(.*)", "dest": "/backend/app/main.py" },
-    { "src": "/count/(.*)", "dest": "/backend/app/main.py" },
-    { "src": "/(.*)", "dest": "/dashboard/$1" }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/backend/app/main.py" },
+    { "source": "/(.*)", "destination": "/dashboard/$1" }
   ]
 }
