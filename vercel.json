@@ -2,8 +2,5 @@
   "version": 2,
   "rewrites": [
     { "source": "/(.*)", "destination": "/dashboard/$1" }
-  ],
-  "builds": [
-    { "src": "dashboard", "use": "@vercel/next" }
   ]
 }
