@@ -69,6 +69,7 @@ export default function PrayerAssistant() {
       setCustomUrlInput(API_BASE);
     }
   }, []);
+  }, []);
 
   const handleSaveApiUrl = (newUrl: string) => {
     const trimmed = newUrl.trim().replace(/\/+$/, "");

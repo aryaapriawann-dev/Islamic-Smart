@@ -67,6 +67,7 @@ export default function ModestDressCheck() {
     } else {
       setCustomUrlInput(API_BASE);
     }
+  }, []);
 
     return () => {
       if (audioPeringatanRef.current) {
