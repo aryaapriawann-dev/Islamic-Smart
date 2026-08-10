@@ -1,5 +1,9 @@
 {
   "version": 2,
+  "framework": "nextjs",
+  "builds": [
+    { "src": "dashboard/package.json", "use": "@vercel/next" }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/dashboard/$1" }
   ]
