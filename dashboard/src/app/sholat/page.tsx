@@ -69,7 +69,6 @@ export default function PrayerAssistant() {
       setCustomUrlInput(API_BASE);
     }
   }, []);
-  }, []);
 
   const handleSaveApiUrl = (newUrl: string) => {
     const trimmed = newUrl.trim().replace(/\/+$/, "");
@@ -78,7 +77,7 @@ export default function PrayerAssistant() {
       setApiUrl(trimmed);
     } else {
       localStorage.removeItem("ISLAMIC_SMART_API_BASE");
-      setApiUrl(DEFAULT_API_BASE);
+      setApiUrl(API_BASE);
     }
     setShowApiModal(false);
     setBackendError(false);

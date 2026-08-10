@@ -69,16 +69,6 @@ export default function ModestDressCheck() {
     }
   }, []);
 
-    return () => {
-      if (audioPeringatanRef.current) {
-        audioPeringatanRef.current.pause();
-      }
-      if (audioAmanRef.current) {
-        audioAmanRef.current.pause();
-      }
-    };
-  }, []);
-
   const handleSaveApiUrl = (newUrl: string) => {
     const trimmed = newUrl.trim().replace(/\/+$/, "");
     if (trimmed) {
@@ -86,7 +76,7 @@ export default function ModestDressCheck() {
       setApiUrl(trimmed);
     } else {
       localStorage.removeItem("ISLAMIC_SMART_API_BASE");
-      setApiUrl(DEFAULT_API_BASE);
+      setApiUrl(API_BASE);
     }
     setShowApiModal(false);
     setBackendError(false);
