@@ -14,11 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ihsan.id",
-  description: "Asisten digital masjid yang privat, sopan, dan berguna.",
+  title: "Islamic Smart Assistance",
+  description: "Islamic Smart Assistance — Digital Mosque Kiosk Infrastructure",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="id"

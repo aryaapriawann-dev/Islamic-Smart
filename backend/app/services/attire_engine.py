@@ -5,16 +5,18 @@ import mediapipe as mp
 import numpy as np
 import base64
 
+from app.services.attire_service import log_attire_check
 
-# Initialize MediaPipe pose once
+
+# Initialize MediaPipe pose once with High Accuracy Model Complexity 2
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
 pose = mp_pose.Pose(
-    min_detection_confidence=0.75,
-    min_tracking_confidence=0.75,
+    min_detection_confidence=0.85,
+    min_tracking_confidence=0.85,
     enable_segmentation=True,
-    model_complexity=1,
+    model_complexity=2,
 )
 
 # Colors (BGR)
@@ -62,15 +64,16 @@ def _gambar_meter_persen(frame, x, y, lebar, tinggi, persen, warna_bar):
     cv2.putText(frame, label, (x + lebar // 2 - tw // 2, y + tinggi - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.45, PUTIH, 1, cv2.LINE_AA)
 
 def _mask_kulit(frame_bgr, frame_hsv, frame_ycrcb):
+    # Calibrated High Precision YCrCb bounds for reliable skin detection across varied indoor lighting
     mask_ycrcb = cv2.inRange(
         frame_ycrcb,
-        np.array([60, 135, 85]),
-        np.array([255, 168, 125]),
+        np.array([50, 133, 77]),
+        np.array([255, 173, 127]),
     )
     mask_hsv = cv2.inRange(
         frame_hsv,
-        np.array([0, 25, 70]),
-        np.array([18, 170, 255]),
+        np.array([0, 20, 70]),
+        np.array([22, 180, 255]),
     )
     B = frame_bgr[:, :, 0].astype(np.float32) + 1.0
     G = frame_bgr[:, :, 1].astype(np.float32) + 1.0
@@ -78,13 +81,13 @@ def _mask_kulit(frame_bgr, frame_hsv, frame_ycrcb):
 
     ratio_rg = R / G
     mask_bgr = (
-        (R > 80)
-        & (G > 40)
-        & (B > 25)
+        (R > 75)
+        & (G > 35)
+        & (B > 20)
         & (R > G)
         & (G > B)
-        & (ratio_rg >= 1.08)
-        & (ratio_rg <= 1.75)
+        & (ratio_rg >= 1.05)
+        & (ratio_rg <= 1.80)
     ).astype(np.uint8) * 255
 
     mask_kulit = cv2.bitwise_and(cv2.bitwise_and(mask_hsv, mask_ycrcb), mask_bgr)
@@ -301,6 +304,9 @@ def detect_attire_from_frame(image_base64: str, mode: str = "PEREMPUAN", thresho
     else:
         status = "RAPI"
         message = "Alhamdulillah, pakaian sudah rapi dan menutup aurat dengan baik."
+
+    if pose_detected:
+        log_attire_check(status, persen_aurat, mode)
 
     return {
         "pose_detected": pose_detected,

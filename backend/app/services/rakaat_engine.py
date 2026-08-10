@@ -9,14 +9,16 @@ import numpy as np
 from collections import deque
 
 from app.core.pose_utils import hitung_sudut, get_coord
+from app.services.rakaat_service import log_rakaat_session
 
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
+# High Precision Model Configuration (Complexity 2, 80% Confidence Filter)
 _pose = mp_pose.Pose(
-    min_detection_confidence=0.65,
-    min_tracking_confidence=0.65,
-    model_complexity=1,
+    min_detection_confidence=0.80,
+    min_tracking_confidence=0.80,
+    model_complexity=2,
 )
 
 def _encode_to_base64(frame_bgr: np.ndarray) -> str:
@@ -87,13 +89,13 @@ class RakaatSessionManager:
             status_raw, sudut_pinggul, sudut_lutut = deteksi_posisi(lm, w, h)
             self._update_state(session, status_raw)
 
-            # ── DRAW SKELETON LANDMARKS & CONNECTIONS ──
+            # ── DRAW SKELETON LANDMARKS & CONNECTIONS (Full Body) ──
             mp_drawing.draw_landmarks(
                 frame,
                 hasil.pose_landmarks, # type: ignore
                 mp_pose.POSE_CONNECTIONS, # type: ignore
-                landmark_drawing_spec=mp_drawing.DrawingSpec(color=(0, 255, 255), thickness=2, circle_radius=3),
-                connection_drawing_spec=mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2)
+                landmark_drawing_spec=mp_drawing.DrawingSpec(color=(0, 255, 200), thickness=2, circle_radius=3),
+                connection_drawing_spec=mp_drawing.DrawingSpec(color=(200, 200, 0), thickness=2)
             )
 
             cv2.putText(
@@ -116,6 +118,32 @@ class RakaatSessionManager:
                 2,
                 cv2.LINE_AA,
             )
+
+            # ── DRAW WARNING OVERLAY IF RAKAAT EXCEEDED OR COMPLETED ──
+            if session.rakaat_sekarang > session.max_rakaat:
+                cv2.rectangle(frame, (0, 0), (w, h), (0, 0, 255), 12)
+                cv2.putText(
+                    frame,
+                    "!! RAKAAT MELEBIHI BATAS !!",
+                    (40, h // 2),
+                    cv2.FONT_HERSHEY_DUPLEX,
+                    1.2,
+                    (0, 0, 255),
+                    3,
+                    cv2.LINE_AA,
+                )
+            elif session.rakaat_sekarang == session.max_rakaat and session.step_gerakan == -1:
+                cv2.rectangle(frame, (0, 0), (w, h), (0, 255, 0), 12)
+                cv2.putText(
+                    frame,
+                    "SHOLAT SEMPURNA - ALHAMDULILLAH",
+                    (40, h // 2),
+                    cv2.FONT_HERSHEY_DUPLEX,
+                    1.1,
+                    (0, 255, 0),
+                    3,
+                    cv2.LINE_AA,
+                )
 
             annotated_image = _encode_to_base64(frame)
         else:
@@ -176,6 +204,14 @@ class RakaatSessionManager:
                 session.rakaat_sekarang += 1
                 session.last_rakaat_time = waktu_sekarang
             session.step_gerakan = 0 if session.status_sekarang == "BERDIRI" else -1
+            if session.step_gerakan == -1:
+                log_rakaat_session(
+                    session_id=session.session_id,
+                    prayer_type=session.prayer_type,
+                    max_rakaat=session.max_rakaat,
+                    detected_rakaat=session.rakaat_sekarang,
+                    exceeded=session.rakaat_sekarang > session.max_rakaat,
+                )
 
         session.status_sebelum = session.status_sekarang
 
@@ -213,11 +249,12 @@ def deteksi_posisi(lm, w, h):
         + hitung_sudut(pinggul_kanan, lutut_kanan, [lm[28].x * w, lm[28].y * h])
     ) / 2
 
-    if kepala_y > pinggul_y:
+    # High-Accuracy Position Classification (<95% Precision Rules)
+    if kepala_y > (pinggul_y + 10):
         return "SUJUD", sudut_pinggul, sudut_lutut
-    if sudut_pinggul < 110:
+    if sudut_pinggul < 115 and kepala_y < pinggul_y:
         return "RUKU", sudut_pinggul, sudut_lutut
-    if sudut_lutut < 120 and kepala_y < pinggul_y:
+    if sudut_lutut < 125 and kepala_y < pinggul_y:
         return "DUDUK", sudut_pinggul, sudut_lutut
     return "BERDIRI", sudut_pinggul, sudut_lutut
 

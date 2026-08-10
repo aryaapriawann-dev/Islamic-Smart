@@ -3,177 +3,190 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  ShirtFolded,
-  HandsPraying,
   ChartBar,
   Info,
   Question,
   ShieldCheck,
   X,
   TrendUp,
+  ShirtFolded,
+  HandsPraying,
+  LockKey,
 } from "@phosphor-icons/react";
+import ThreeBackground from "./components/ThreeBackground";
+import Interactive3DCard from "./components/Interactive3DCard";
 
 export default function Home() {
   const [showQuickHelp, setShowQuickHelp] = useState(false);
 
   return (
-    <main className="min-h-screen bg-[#fdfbf7] text-zinc-900 flex flex-col justify-between selection:bg-amber-100">
-      {/* Top Header Section - Stitch Design */}
-      <header className="relative bg-[#064e3b] geometric-bg text-amber-100 py-10 px-4 shadow-lg border-b border-amber-600/30 text-center">
-        <div className="mx-auto max-w-4xl flex items-center justify-between">
-          <div className="w-10" />
-          <h1 className="text-4xl font-serif font-bold tracking-wider text-amber-200 drop-shadow-md">
-            Ihsan.id
-          </h1>
+    <main className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between overflow-hidden selection:bg-emerald-100 selection:text-emerald-900 bg-clean-grid">
+      {/* 3D WebGL Background */}
+      <ThreeBackground className="fixed inset-0 pointer-events-none z-0 opacity-40" />
+
+      {/* Top Header */}
+      <header className="relative z-10 py-5 px-6 border-b border-slate-200 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto max-w-6xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Islamic Smart Assistance Logo" className="h-14 w-auto" />
+            <div className="hidden sm:block">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">
+                Islamic Smart
+              </h1>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">
+                Assistance • Privacy First
+              </p>
+            </div>
+          </div>
+
           <button
             onClick={() => setShowQuickHelp(true)}
-            className="p-2.5 rounded-full bg-emerald-900/60 border border-amber-500/40 text-amber-200 hover:bg-emerald-800/80 transition"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition text-xs font-medium"
             title="Bantuan Cepat"
           >
-            <Question size={20} weight="bold" />
+            <Question size={16} className="text-emerald-600" />
+            <span>Panduan Kiosk</span>
           </button>
         </div>
       </header>
 
-      {/* Main Content Cards Section */}
-      <section className="flex-1 max-w-5xl mx-auto w-full px-4 py-12 flex flex-col items-center justify-center">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
-          {/* Card 1: Cek Kesesuaian Pakaian */}
-          <Link
+      {/* Hero Header & 3D Interactive Feature Section */}
+      <section className="relative z-10 flex-1 max-w-5xl mx-auto w-full px-6 py-12 flex flex-col items-center justify-center space-y-10">
+        {/* Title Badge & Hero Typography */}
+        <div className="text-center space-y-4 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium shadow-xs">
+            <LockKey size={15} className="text-emerald-600" />
+            <span>Pemrosesan Lokal In-Memory • Bebas Penyimpanan Foto</span>
+          </div>
+
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900 tracking-tight leading-tight">
+            Asisten Digital Masjid yang Sopan & Menjaga Privasi
+          </h2>
+
+          <p className="text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
+            Membantu kesesuaian pakaian jamaah di area ibadah serta menghitung rakaat sholat pribadi secara otomatis tanpa menyimpan data identitas.
+          </p>
+        </div>
+
+        {/* 3D Interactive Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
+          <Interactive3DCard
+            title="Cek Kesesuaian Pakaian"
+            description="Bimbingan visual privat untuk mengecek standar aurat dan kerapian pakaian sebelum memasuki area utama masjid."
+            badge="Mulai Pemeriksaan"
+            iconType="shirt"
             href="/pakaian"
-            className="group rounded-3xl bg-white border border-amber-600/20 p-8 shadow-xl hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 flex flex-col items-center text-center space-y-5 cursor-pointer relative overflow-hidden"
-          >
-            <div className="size-20 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shadow-inner border border-amber-200/60 group-hover:scale-110 transition duration-300">
-              <ShirtFolded size={44} weight="duotone" />
-            </div>
+          />
 
-            <div className="space-y-2">
-              <h2 className="text-2xl font-serif font-bold text-zinc-900 group-hover:text-[#064e3b] transition">
-                Cek Kesesuaian Pakaian
-              </h2>
-              <p className="text-sm text-zinc-600 leading-relaxed max-w-sm">
-                Dapatkan bimbingan visual untuk memastikan pakaian yang sopan dan pantas saat berada di masjid.
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#064e3b] text-white text-xs font-semibold shadow-md group-hover:bg-emerald-600 transition">
-                <span>Mulai Pemeriksaan</span>
-              </span>
-            </div>
-          </Link>
-
-          {/* Card 2: Sesi Sholat Pribadi */}
-          <Link
+          <Interactive3DCard
+            title="Sesi Sholat Pribadi"
+            description="Penghitung rakaat visual privat dan pedoman gerakan sholat real-time tanpa pengenalan identitas."
+            badge="Mulai Asisten Sholat"
+            iconType="prayer"
             href="/sholat"
-            className="group rounded-3xl bg-white border border-amber-600/20 p-8 shadow-xl hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 flex flex-col items-center text-center space-y-5 cursor-pointer relative overflow-hidden"
-          >
-            <div className="size-20 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shadow-inner border border-amber-200/60 group-hover:scale-110 transition duration-300">
-              <HandsPraying size={44} weight="duotone" />
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-2xl font-serif font-bold text-zinc-900 group-hover:text-[#064e3b] transition">
-                Sesi Sholat Pribadi
-              </h2>
-              <p className="text-sm text-zinc-600 leading-relaxed max-w-sm">
-                Panduan langkah demi langkah untuk melaksanakan sholat pribadi dengan khusyuk.
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#064e3b] text-white text-xs font-semibold shadow-md group-hover:bg-emerald-600 transition">
-                <span>Mulai Sesi Sholat</span>
-              </span>
-            </div>
-          </Link>
+          />
         </div>
 
         {/* Quick Navigation Pills */}
-        <div className="mt-12 flex flex-wrap justify-center items-center gap-3 text-xs">
+        <div className="flex flex-wrap justify-center items-center gap-3 text-xs z-10 pt-2">
           <Link
             href="/statistik"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-amber-600/20 text-zinc-700 font-semibold shadow-sm hover:border-emerald-600 hover:text-emerald-700 transition"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium shadow-xs hover:border-emerald-500 hover:text-emerald-700 transition"
           >
-            <ChartBar size={16} className="text-emerald-700" />
+            <ChartBar size={16} className="text-emerald-600" />
             <span>Statistik Pengunjung</span>
           </Link>
           <Link
             href="/tentang"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-amber-600/20 text-zinc-700 font-semibold shadow-sm hover:border-emerald-600 hover:text-emerald-700 transition"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium shadow-xs hover:border-emerald-500 hover:text-emerald-700 transition"
           >
-            <Info size={16} className="text-emerald-700" />
+            <Info size={16} className="text-emerald-600" />
             <span>Tentang Ihsan.id</span>
           </Link>
           <Link
             href="/bantuan"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-amber-600/20 text-zinc-700 font-semibold shadow-sm hover:border-emerald-600 hover:text-emerald-700 transition"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium shadow-xs hover:border-emerald-500 hover:text-emerald-700 transition"
           >
-            <Question size={16} className="text-emerald-700" />
+            <Question size={16} className="text-emerald-600" />
             <span>Bantuan</span>
           </Link>
           <Link
             href="/admin"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-amber-600/20 text-zinc-700 font-semibold shadow-sm hover:border-emerald-600 hover:text-emerald-700 transition"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium shadow-xs hover:border-emerald-500 hover:text-emerald-700 transition"
           >
-            <ShieldCheck size={16} className="text-emerald-700" />
+            <ShieldCheck size={16} className="text-emerald-600" />
             <span>Admin Dasbor</span>
           </Link>
         </div>
       </section>
 
-      {/* Quick Help Overlay Modal - Stitch Screen 5 */}
+      {/* Quick Help Modal */}
       {showQuickHelp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-[#fdfbf7] rounded-3xl border-2 border-amber-600/50 shadow-2xl p-6 relative space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-xl p-6 relative space-y-5 text-slate-900">
             <button
               onClick={() => setShowQuickHelp(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-full bg-amber-100 text-zinc-700 hover:bg-amber-200 transition"
+              className="absolute top-4 right-4 p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
 
-            <div className="text-center space-y-1">
-              <h3 className="text-xl font-serif font-bold text-zinc-900">Quick Help</h3>
-              <p className="text-xs text-zinc-500">Panduan Ringkas Penggunaan Kiosk</p>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-900">Panduan Ringkas Kiosk</h3>
+              <p className="text-xs text-slate-500">Penggunaan Layanan Ihsan.id Digital</p>
             </div>
 
-            <div className="space-y-4 text-xs font-medium text-zinc-700">
-              <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-amber-600/20 shadow-sm">
-                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-                  <ShirtFolded size={22} />
+            <div className="space-y-3 text-xs font-medium">
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+                  <ShirtFolded size={20} />
                 </div>
-                <span>Tekan "Cek Pakaian" untuk mengecek kesesuaian aurat secara privat.</span>
+                <div>
+                  <h4 className="font-semibold text-slate-900">Pemeriksaan Pakaian</h4>
+                  <p className="text-slate-600 leading-relaxed">
+                    Tekan tombol "Cek Kesesuaian Pakaian" untuk menganalisis kerapian aurat menggunakan kamera secara steril & privat.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-amber-600/20 shadow-sm">
-                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-                  <HandsPraying size={22} />
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+                  <HandsPraying size={20} />
                 </div>
-                <span>Tekan "Sesi Sholat" untuk memulai penghitung rakaat pribadi.</span>
+                <div>
+                  <h4 className="font-semibold text-slate-900">Asisten Sholat</h4>
+                  <p className="text-slate-600 leading-relaxed">
+                    Gunakan fitur ini untuk mendeteksi rakaat sholat pribadi dan membantu Anda tetap fokus tanpa gangguan.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-amber-600/20 shadow-sm">
-                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-                  <TrendUp size={22} />
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+                  <TrendUp size={20} />
                 </div>
-                <span>Lihat statistik kehadiran jamaah di tombol bagian bawah.</span>
+                <div>
+                  <h4 className="font-semibold text-slate-900">Statistik Kehadiran</h4>
+                  <p className="text-slate-600 leading-relaxed">
+                    Akses data kehadiran jamaah dan laporan analitik masjid melalui menu di bagian bawah.
+                  </p>
+                </div>
               </div>
             </div>
 
             <button
               onClick={() => setShowQuickHelp(false)}
-              className="w-full py-3 rounded-2xl bg-[#064e3b] hover:bg-emerald-700 text-white font-bold text-sm shadow-lg transition border border-amber-400/40"
+              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-sm transition"
             >
-              Mengerti
+              Mengerti & Lanjutkan
             </button>
           </div>
         </div>
       )}
 
       {/* Footer */}
-      <footer className="py-4 text-center text-xs text-zinc-500 border-t border-amber-950/10">
-        &copy; {new Date().getFullYear()} Ihsan.id. Calm. Modest. Connected.
+      <footer className="relative z-10 py-4 text-center text-xs text-slate-500 border-t border-slate-200 bg-white">
+        &copy; {new Date().getFullYear()} Ihsan.id • Respectful Digital Mosque Infrastructure.
       </footer>
     </main>
   );

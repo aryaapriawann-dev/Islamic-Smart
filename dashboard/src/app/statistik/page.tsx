@@ -5,73 +5,126 @@ import Link from "next/link";
 import {
   FilePdf,
   CalendarBlank,
-  Users,
-  TrendUp,
   ArrowLeft,
-  Sparkle,
-  DownloadSimple,
+  FileCsv,
 } from "@phosphor-icons/react";
 
 interface VisitorSummary {
   today_count: number;
   total_visitors: number;
-  peak_hour: string;
-  weekly_trend: { day: string; count: number }[];
+  peak_prayer: string;
+  prayer_breakdown: { [key: string]: number };
 }
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 export default function VisitorStatistics() {
   const [summary, setSummary] = useState<VisitorSummary>({
-    today_count: 1420,
-    total_visitors: 15800,
-    peak_hour: "12:00 - 13:00 (Zuhur)",
-    weekly_trend: [
-      { day: "Jan 1", count: 600 },
-      { day: "Jan 15", count: 1300 },
-      { day: "Feb 1", count: 1700 },
-      { day: "Feb 15", count: 1750 },
-      { day: "Mar 1", count: 2300 },
-      { day: "Mar 15", count: 1600 },
-      { day: "Apr 1", count: 550 },
-    ],
+    today_count: 0,
+    total_visitors: 0,
+    peak_prayer: "-",
+    prayer_breakdown: {
+      SUBUH: 0,
+      ZUHUR: 0,
+      ASHAR: 0,
+      MAGHRIB: 0,
+      ISYA: 0,
+    },
   });
-
-  const [dateRange, setDateRange] = useState("January 2024 - March 2024");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/count/visitor/summary")
+    fetch(`${API_BASE}/count/visitor/summary`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.total_visitors) {
-          setSummary((prev) => ({ ...prev, ...data }));
-        }
+        const breakdown = data.prayer_breakdown || {
+          SUBUH: 0,
+          ZUHUR: 0,
+          ASHAR: 0,
+          MAGHRIB: 0,
+          ISYA: 0,
+        };
+
+        const peakEntry = Object.entries(breakdown).reduce(
+          (max, [key, val]) =>
+            (val as number) > (max[1] as number) ? [key, val] : max,
+          ["", 0]
+        );
+
+        const prayerTimeMap: Record<string, string> = {
+          SUBUH: "04:30 - 05:30 (Subuh)",
+          ZUHUR: "12:00 - 13:00 (Zuhur)",
+          ASHAR: "15:00 - 16:00 (Ashar)",
+          MAGHRIB: "18:00 - 19:00 (Maghrib)",
+          ISYA: "19:15 - 20:15 (Isya)",
+        };
+
+        setSummary({
+          today_count: data.total_today || 0,
+          total_visitors: data.total_month || 0,
+          peak_prayer:
+            (peakEntry[1] as number) > 0
+              ? prayerTimeMap[peakEntry[0] as string] || peakEntry[0] as string
+              : "Belum ada data",
+          prayer_breakdown: breakdown,
+        });
       })
       .catch(() => {
-        console.log("Using local initial summary state");
-      });
+        console.log("Backend tidak tersedia");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleDownloadPDF = () => {
-    window.open("http://localhost:8000/api/report/visitor?format=pdf", "_blank");
+  const handleDownloadReport = (format: string) => {
+    const today = new Date().toISOString().split("T")[0];
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "/api/report/visitor";
+    form.target = "_blank";
+
+    const inputStart = document.createElement("input");
+    inputStart.type = "hidden";
+    inputStart.name = "startDate";
+    inputStart.value = "2024-01-01";
+    form.appendChild(inputStart);
+
+    const inputEnd = document.createElement("input");
+    inputEnd.type = "hidden";
+    inputEnd.name = "endDate";
+    inputEnd.value = today;
+    form.appendChild(inputEnd);
+
+    const inputFormat = document.createElement("input");
+    inputFormat.type = "hidden";
+    inputFormat.name = "format";
+    inputFormat.value = format === "pdf" ? "html" : "csv";
+    form.appendChild(inputFormat);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
   };
 
+  const maxVal = Math.max(
+    ...Object.values(summary.prayer_breakdown),
+    1
+  );
+
   return (
-    <main className="min-h-screen bg-[#fdfbf7] text-zinc-900 flex flex-col justify-between selection:bg-amber-100">
-      {/* Stitch Top Header */}
-      <header className="border-b border-amber-950/10 py-5 px-6 sticky top-0 z-20 bg-[#fdfbf7]">
+    <main className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between selection:bg-emerald-100 bg-clean-grid">
+      <header className="border-b border-slate-200 py-4 px-6 sticky top-0 z-20 bg-white/80 backdrop-blur-md">
         <div className="mx-auto max-w-5xl flex items-center justify-between">
           <Link
             href="/"
-            className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100 transition"
+            className="p-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition"
           >
             <ArrowLeft size={18} />
           </Link>
 
-          <div className="flex items-center gap-2">
-            <div className="size-8 rounded-full bg-[#064e3b] text-amber-300 flex items-center justify-center font-bold text-sm shadow">
-              🕌
-            </div>
-            <span className="text-xl font-serif font-bold text-zinc-900 tracking-wide">
-              Ihsan.id
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Islamic Smart Assistance Logo" className="h-8 w-auto" />
+            <span className="text-base font-bold text-slate-900">
+              Islamic Smart
             </span>
           </div>
 
@@ -79,81 +132,74 @@ export default function VisitorStatistics() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <section className="flex-1 max-w-4xl mx-auto w-full px-4 py-8 space-y-8 text-center">
-        {/* Page Title */}
-        <div className="space-y-2">
-          <h1 className="text-3xl md:text-4xl font-serif font-bold text-zinc-900 tracking-tight">
-            Visitor Statistics
+      <section className="flex-1 max-w-4xl mx-auto w-full px-6 py-8 space-y-6 text-center">
+        <div className="space-y-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
+            Statistik Kunjungan Jamaah
           </h1>
+          <p className="text-xs text-slate-500">
+            Penghitungan otomatis teragregasi tanpa identifikasi wajah.
+          </p>
         </div>
 
-        {/* Date Range Selector Pill */}
-        <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-50 border border-amber-300 text-xs font-semibold text-zinc-700 shadow-sm">
-          <CalendarBlank size={16} className="text-amber-800" />
-          <span>Date Range: {dateRange}</span>
-          <span className="text-amber-800">▼</span>
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 shadow-xs">
+          <CalendarBlank size={16} className="text-slate-500" />
+          <span>Rentang Waktu: Hari Ini (Real-Time Jamaah)</span>
         </div>
 
-        {/* Stitch Large White Chart Card */}
-        <div className="rounded-3xl bg-white border border-amber-600/20 p-8 shadow-xl space-y-6 text-center">
-          <h2 className="text-2xl font-serif font-bold text-[#047857]">
-            Total Visitors: {summary.total_visitors.toLocaleString()}
-          </h2>
-
-          {/* Curved SVG Area Chart */}
-          <div className="relative w-full h-64 border-b border-zinc-200 flex items-end pt-4 pb-2 px-4">
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 700 200" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#047857" stopOpacity="0.55" />
-                  <stop offset="100%" stopColor="#047857" stopOpacity="0.05" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0,160 Q 100,80 200,60 T 400,60 T 500,20 T 600,80 T 700,160 L 700,200 L 0,200 Z"
-                fill="url(#areaGradient)"
-              />
-              <path
-                d="M 0,160 Q 100,80 200,60 T 400,60 T 500,20 T 600,80 T 700,160"
-                fill="none"
-                stroke="#047857"
-                strokeWidth="3"
-              />
-              {/* Dots */}
-              <circle cx="0" cy="160" r="4" fill="#047857" />
-              <circle cx="116" cy="100" r="4" fill="#047857" />
-              <circle cx="233" cy="60" r="4" fill="#047857" />
-              <circle cx="350" cy="60" r="4" fill="#047857" />
-              <circle cx="466" cy="20" r="5" fill="#047857" stroke="#fff" strokeWidth="2" />
-              <circle cx="583" cy="80" r="4" fill="#047857" />
-              <circle cx="700" cy="160" r="4" fill="#047857" />
-            </svg>
+        <div className="rounded-2xl bg-white border border-slate-200 p-8 shadow-xs space-y-6 text-center">
+          <div className="space-y-1">
+            <span className="text-xs text-slate-500 font-medium uppercase tracking-wider block">
+              Distribusi Kunjungan Jamaah Per Waktu Sholat
+            </span>
+            <h2 className="text-3xl font-extrabold text-slate-900">
+              {loading ? "..." : summary.today_count.toLocaleString("id-ID")} Jamaah Hari Ini
+            </h2>
+            <p className="text-xs text-emerald-700 font-semibold pt-1">
+              Puncak Kunjungan: {summary.peak_prayer}
+            </p>
           </div>
 
-          {/* X Axis Labels */}
-          <div className="grid grid-cols-7 text-[11px] text-zinc-500 font-medium pt-1">
-            {summary.weekly_trend.map((item, idx) => (
-              <span key={idx}>{item.day}</span>
+          <div className="h-48 rounded-xl bg-slate-50 border border-slate-200 p-6 flex items-end justify-between gap-4">
+            {[
+              { time: "Subuh", val: summary.prayer_breakdown.SUBUH },
+              { time: "Zuhur", val: summary.prayer_breakdown.ZUHUR },
+              { time: "Ashar", val: summary.prayer_breakdown.ASHAR },
+              { time: "Maghrib", val: summary.prayer_breakdown.MAGHRIB },
+              { time: "Isya", val: summary.prayer_breakdown.ISYA },
+            ].map((item) => (
+              <div key={item.time} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                <span className="text-xs font-bold text-slate-900">{item.val}</span>
+                <div
+                  className="w-full rounded-t-lg bg-slate-900 hover:bg-emerald-600 transition-all duration-300"
+                  style={{ height: maxVal > 0 ? `${(item.val / maxVal) * 85}%` : "0%" }}
+                />
+                <span className="text-xs text-slate-600 font-semibold">{item.time}</span>
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Stitch Download PDF Action Button */}
-        <div>
+        <div className="flex flex-wrap justify-center items-center gap-3">
           <button
-            onClick={handleDownloadPDF}
-            className="px-8 py-3.5 rounded-full bg-[#047857] hover:bg-emerald-800 text-white font-serif font-bold text-sm shadow-xl transition flex items-center justify-center gap-2 mx-auto border border-emerald-500/40"
+            onClick={() => handleDownloadReport("pdf")}
+            className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs shadow-xs transition flex items-center justify-center gap-2"
           >
-            <span>Download PDF Report</span>
-            <FilePdf size={20} weight="fill" className="text-amber-300" />
+            <FilePdf size={18} />
+            <span>Unduh Laporan PDF</span>
+          </button>
+          <button
+            onClick={() => handleDownloadReport("csv")}
+            className="px-6 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-xs shadow-xs transition flex items-center justify-center gap-2"
+          >
+            <FileCsv size={18} />
+            <span>Unduh Format CSV Raw</span>
           </button>
         </div>
       </section>
 
-      {/* Stitch Design Bottom Footer with Islamic Pattern */}
-      <footer className="py-5 text-center text-[11px] text-zinc-500 border-t border-amber-950/10 bg-gradient-to-r from-amber-50 via-white to-amber-50">
-        &copy; 2024 Ihsan.id. Calm. Modest. Connected. No login required for public data.
+      <footer className="py-4 text-center text-xs text-slate-500 border-t border-slate-200 bg-white">
+        &copy; {new Date().getFullYear()} Ihsan.id • Data teragregasi secara anonim.
       </footer>
     </main>
   );

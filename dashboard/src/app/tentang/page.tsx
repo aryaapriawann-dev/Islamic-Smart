@@ -2,81 +2,79 @@
 
 import React from "react";
 import Link from "next/link";
-import { Eye, HandPointing, ShieldCheck } from "@phosphor-icons/react";
+import { ArrowLeft, ShieldCheck, LockKey, Heart, Question } from "@phosphor-icons/react";
 
-export default function AboutIhsan() {
+export default function TentangPage() {
   return (
-    <main className="min-h-screen bg-[#fdfbf7] text-zinc-900 flex flex-col justify-between selection:bg-amber-100">
-      {/* Stitch Design Header */}
-      <header className="relative bg-[#064e3b] geometric-bg text-amber-100 py-12 px-4 shadow-lg border-b border-amber-600/30 text-center">
-        <h1 className="text-4xl md:text-5xl font-serif font-bold text-amber-200 tracking-wider drop-shadow-md">
-          About Ihsan.id
-        </h1>
-      </header>
-
-      {/* Main Content Area: 3 Cards */}
-      <section className="flex-1 max-w-6xl mx-auto w-full px-6 py-12 flex flex-col items-center justify-center space-y-10">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
-          {/* Card 1: Visi Kami */}
-          <div className="rounded-3xl bg-[#fdfbf7] border border-amber-600/30 p-8 shadow-md hover:shadow-xl transition flex flex-col items-center text-center space-y-5">
-            <div className="size-16 rounded-2xl bg-amber-100/70 text-amber-800 flex items-center justify-center shadow-inner">
-              <Eye size={36} weight="duotone" />
-            </div>
-
-            <h2 className="text-2xl font-serif font-bold text-zinc-900">
-              Visi Kami
-            </h2>
-
-            <p className="text-xs text-zinc-600 leading-relaxed font-sans">
-              Visi kami adalah mendukung kekhusyukan dan kesucian masjid dengan menyediakan alat bantu yang tenang dan bermartabat untuk mengingatkan tentang tata krama berpakaian sopan, membantu dalam ibadah, dan memberikan data kunjungan yang bermanfaat tanpa mengganggu privasi.
-            </p>
-          </div>
-
-          {/* Card 2: Panduan Penggunaan */}
-          <div className="rounded-3xl bg-[#fdfbf7] border border-amber-600/30 p-8 shadow-md hover:shadow-xl transition flex flex-col items-center text-center space-y-5">
-            <div className="size-16 rounded-2xl bg-amber-100/70 text-amber-800 flex items-center justify-center shadow-inner">
-              <HandPointing size={36} weight="duotone" />
-            </div>
-
-            <h2 className="text-2xl font-serif font-bold text-zinc-900">
-              Panduan Penggunaan
-            </h2>
-
-            <p className="text-xs text-zinc-600 leading-relaxed font-sans">
-              Ihsan.id berfungsi sebagai kios non-intrusif yang terletak di area masjid. Pengunjung dapat berinteraksi dengan layar sentuh untuk mengakses informasi waktu salat, panduan tata krama, dan statistik pengunjung secara real-time.
-            </p>
-          </div>
-
-          {/* Card 3: Privasi Pengguna */}
-          <div className="rounded-3xl bg-[#fdfbf7] border border-amber-600/30 p-8 shadow-md hover:shadow-xl transition flex flex-col items-center text-center space-y-5">
-            <div className="size-16 rounded-2xl bg-amber-100/70 text-amber-800 flex items-center justify-center shadow-inner">
-              <ShieldCheck size={36} weight="duotone" />
-            </div>
-
-            <h2 className="text-2xl font-serif font-bold text-zinc-900">
-              Privasi Pengguna
-            </h2>
-
-            <p className="text-xs text-zinc-600 leading-relaxed font-sans">
-              Kami sangat menghargai privasi Anda. Ihsan.id dirancang dengan prinsip transparansi. Tidak ada data pribadi, gambar, atau informasi identifikasi apa pun yang disimpan, direkam, atau dibagikan. Sistem hanya menghitung statistik kunjungan secara anonim.
-            </p>
-          </div>
-        </div>
-
-        {/* Stitch Primary Green Action Button */}
-        <div>
+    <main className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between selection:bg-emerald-100 bg-clean-grid">
+      {/* Header */}
+      <header className="border-b border-slate-200 py-4 px-6 sticky top-0 z-20 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto max-w-4xl flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-[#047857] hover:bg-emerald-800 text-white font-serif font-bold text-sm shadow-xl transition border border-emerald-500/40"
+            className="p-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition"
           >
-            Kembali ke Menu Utama
+            <ArrowLeft size={18} />
           </Link>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Islamic Smart Assistance Logo" className="h-8 w-auto" />
+            <span className="text-base font-bold text-slate-900">Islamic Smart Assistance</span>
+          </div>
+          <div className="w-8" />
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <section className="flex-1 max-w-3xl mx-auto w-full px-6 py-10 space-y-8">
+        <div className="space-y-3 text-center">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
+            <LockKey size={14} className="text-emerald-600" />
+            Privasi & Martabat Jamaah Pertama
+          </span>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+            Visi & Standar Operasional Ihsan.id
+          </h1>
+          <p className="text-xs text-slate-600 leading-relaxed max-w-lg mx-auto">
+            Asisten digital masjid modern yang memadukan teknologi Computer Vision ramah privasi untuk mendukung kekhusyu'an dan kerapian ibadah.
+          </p>
+        </div>
+
+        <div className="space-y-4 text-xs leading-relaxed text-slate-700">
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <ShieldCheck size={18} className="text-emerald-600" />
+              1. Jaminan Bebas Penyimpanan Foto (In-Memory Processing)
+            </h3>
+            <p>
+              Seluruh pemrosesan deteksi pakaian dan rakaat sholat dilakukan secara real-time di dalam memori server (in-memory) dan frame gambar langsung dibuang detik itu juga. Tidak ada database foto atau rekaman video yang tersimpan secara permanen.
+            </p>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Heart size={18} className="text-emerald-600" />
+              2. Bahasa Pengingat yang Sopan & Tidak Menghakimi
+            </h3>
+            <p>
+              Peringatan yang ditampilkan di layar kiosk dirancang khusus sebagai panduan yang lembut ("Pengingat Sopan" & "Perlu Sujud Sahwi") untuk menjaga rasa hormat dan martabat setiap jamaah yang hadir.
+            </p>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Question size={18} className="text-emerald-600" />
+              3. Graceful Degradation & Emergency Control
+            </h3>
+            <p>
+              Apabila terdapat kendala teknis pada sistem deteksi atau kamera dimatikan oleh admin, kiosk akan beralih ke mode ramah jamaah tanpa memblokir atau menghambat akses jamaah ke dalam masjid.
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-5 text-center text-xs text-zinc-500 border-t border-amber-950/10">
-        &copy; {new Date().getFullYear()} Ihsan.id. Calm. Modest. Connected.
+      <footer className="py-4 text-center text-xs text-slate-500 border-t border-slate-200 bg-white">
+        &copy; {new Date().getFullYear()} Ihsan.id • Modest. Calm. Connected.
       </footer>
     </main>
   );

@@ -14,13 +14,13 @@ export default function ReportPage() {
     <AdminLayout>
       <div className="space-y-6 max-w-4xl">
         <div>
-          <h2 className="text-lg font-bold">Laporan Kunjungan Masjid</h2>
-          <p className="text-xs text-muted-foreground">
-            Unduh laporan rekapitulasi jumlah pengunjung per waktu sholat dalam format CSV atau Laporan Siap Cetak (PDF/HTML).
+          <h2 className="text-xl font-bold text-slate-900">Laporan Kunjungan Masjid</h2>
+          <p className="text-xs text-slate-500">
+            Unduh laporan rekapitulasi jumlah pengunjung per waktu sholat dalam format CSV Data Raw atau Laporan Cetak PDF/HTML.
           </p>
         </div>
 
-        <div className="p-6 rounded-2xl border border-border bg-card shadow-md space-y-6">
+        <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-6">
           <form
             action="/api/report/visitor"
             method="POST"
@@ -29,7 +29,7 @@ export default function ReportPage() {
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">
+                <label className="text-xs font-semibold text-slate-700">
                   Dari Tanggal
                 </label>
                 <input
@@ -38,12 +38,12 @@ export default function ReportPage() {
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">
+                <label className="text-xs font-semibold text-slate-700">
                   Sampai Tanggal
                 </label>
                 <input
@@ -52,23 +52,23 @@ export default function ReportPage() {
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-muted-foreground">
+              <label className="text-xs font-semibold text-slate-700">
                 Pilih Format Laporan
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setFormat("csv")}
-                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition ${
+                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-semibold transition ${
                     format === "csv"
-                      ? "bg-emerald-600 text-white border-emerald-500 shadow-md"
-                      : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
+                      ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                   }`}
                 >
                   <FileCsv size={18} />
@@ -78,14 +78,14 @@ export default function ReportPage() {
                 <button
                   type="button"
                   onClick={() => setFormat("html")}
-                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition ${
+                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-semibold transition ${
                     format === "html"
-                      ? "bg-emerald-600 text-white border-emerald-500 shadow-md"
-                      : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
+                      ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                   }`}
                 >
                   <FilePdf size={18} />
-                  <span>Laporan Siap Cetak (HTML/PDF)</span>
+                  <span>Laporan Cetak (PDF / HTML)</span>
                 </button>
               </div>
               <input type="hidden" name="format" value={format} />
@@ -94,10 +94,10 @@ export default function ReportPage() {
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shadow-lg flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition shadow-xs flex items-center justify-center gap-2"
               >
                 <DownloadSimple size={18} />
-                <span>Unduh Laporan Kunjungan ({format.toUpperCase()})</span>
+                <span>Unduh Laporan ({format.toUpperCase()})</span>
               </button>
             </div>
           </form>

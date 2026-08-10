@@ -1,9 +1,12 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import attire, rakaat, visitor
 
 app = FastAPI(
-    title="Ihsan.id Detection Services",
+    title="Islamic Smart Assistance Detection Services",
     version="1.0.0",
 )
 
