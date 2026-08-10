@@ -144,7 +144,7 @@ export default function Home() {
                 <div>
                   <h4 className="font-semibold text-slate-900">Pemeriksaan Pakaian</h4>
                   <p className="text-slate-600 leading-relaxed">
-                    Tekan tombol "Cek Kesesuaian Pakaian" untuk menganalisis kerapian aurat menggunakan kamera secara steril & privat.
+                    Tekan tombol &quot;Cek Kesesuaian Pakaian&quot; untuk menganalisis kerapian aurat menggunakan kamera secara steril &amp; privat.
                   </p>
                 </div>
               </div>

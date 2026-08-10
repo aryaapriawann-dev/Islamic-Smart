@@ -7,9 +7,7 @@ __pycache__/
 
 # Node & Next.js
 node_modules/
-dashboard/node_modules/
 .next/
-dashboard/.next/
 out/
 build/
 
@@ -19,11 +17,11 @@ build/
 .env.*
 !.env.example
 !backend/.env.example
-!dashboard/.env.example
 
 # IDE & OS
 .DS_Store
 Thumbs.db
 *.log
 
+# Vercel
 .vercel

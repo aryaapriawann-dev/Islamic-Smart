@@ -56,19 +56,19 @@ export default function PrayerAssistant() {
   const [backendError, setBackendError] = useState(false);
 
   // API Base Configuration with localStorage support
-  const [apiUrl, setApiUrl] = useState<string>(API_BASE);
-  const [showApiModal, setShowApiModal] = useState<boolean>(false);
-  const [customUrlInput, setCustomUrlInput] = useState<string>("");
-
-  useEffect(() => {
-    const savedUrl = localStorage.getItem("ISLAMIC_SMART_API_BASE");
-    if (savedUrl) {
-      setApiUrl(savedUrl);
-      setCustomUrlInput(savedUrl);
-    } else {
-      setCustomUrlInput(API_BASE);
+  const [apiUrl, setApiUrl] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ISLAMIC_SMART_API_BASE") || API_BASE;
     }
-  }, []);
+    return API_BASE;
+  });
+  const [showApiModal, setShowApiModal] = useState<boolean>(false);
+  const [customUrlInput, setCustomUrlInput] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ISLAMIC_SMART_API_BASE") || API_BASE;
+    }
+    return API_BASE;
+  });
 
   const handleSaveApiUrl = (newUrl: string) => {
     const trimmed = newUrl.trim().replace(/\/+$/, "");
@@ -149,8 +149,11 @@ export default function PrayerAssistant() {
   };
 
   useEffect(() => {
-    startCamera();
+    const timer = setTimeout(() => {
+      startCamera();
+    }, 0);
     return () => {
+      clearTimeout(timer);
       stopCamera();
     };
   }, [emergencyOff, startCamera]);

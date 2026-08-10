@@ -35,7 +35,7 @@ export default function TentangPage() {
             Visi & Standar Operasional Ihsan.id
           </h1>
           <p className="text-xs text-slate-600 leading-relaxed max-w-lg mx-auto">
-            Asisten digital masjid modern yang memadukan teknologi Computer Vision ramah privasi untuk mendukung kekhusyu'an dan kerapian ibadah.
+            Asisten digital masjid modern yang memadukan teknologi Computer Vision ramah privasi untuk mendukung kekhusyu&apos;an dan kerapian ibadah.
           </p>
         </div>
 
@@ -56,7 +56,7 @@ export default function TentangPage() {
               2. Bahasa Pengingat yang Sopan & Tidak Menghakimi
             </h3>
             <p>
-              Peringatan yang ditampilkan di layar kiosk dirancang khusus sebagai panduan yang lembut ("Pengingat Sopan" & "Perlu Sujud Sahwi") untuk menjaga rasa hormat dan martabat setiap jamaah yang hadir.
+              Peringatan yang ditampilkan di layar kiosk dirancang khusus sebagai panduan yang lembut (&quot;Pengingat Sopan&quot; &amp; &quot;Perlu Sujud Sahwi&quot;) untuk menjaga rasa hormat dan martabat setiap jamaah yang hadir.
             </p>
           </div>
 

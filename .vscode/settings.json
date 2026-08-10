@@ -1,4 +1,6 @@
 {
+  "typescript.tsdk": "dashboard/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
   "python.analysis.extraPaths": [
     "${workspaceFolder}/backend"

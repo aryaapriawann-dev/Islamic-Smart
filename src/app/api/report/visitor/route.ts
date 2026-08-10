@@ -4,6 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
+interface ReportRow {
+  date: string;
+  prayer: string;
+  count: number;
+}
+
 export async function POST(request: Request) {
   try {
     let startDate = "";
@@ -29,7 +35,7 @@ export async function POST(request: Request) {
       endDate = endDate || today;
     }
 
-    let reportRows: { date: string; prayer: string; count: number }[] = [];
+    const reportRows: ReportRow[] = [];
 
     if (supabaseUrl && supabaseKey) {
       const supabase = createClient(supabaseUrl, supabaseKey);

@@ -50,9 +50,19 @@ export default function ModestDressCheck() {
   const [fps, setFps] = useState<number>(0);
 
   // API Base Configuration with localStorage support
-  const [apiUrl, setApiUrl] = useState<string>(API_BASE);
+  const [apiUrl, setApiUrl] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ISLAMIC_SMART_API_BASE") || API_BASE;
+    }
+    return API_BASE;
+  });
   const [showApiModal, setShowApiModal] = useState<boolean>(false);
-  const [customUrlInput, setCustomUrlInput] = useState<string>("");
+  const [customUrlInput, setCustomUrlInput] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ISLAMIC_SMART_API_BASE") || API_BASE;
+    }
+    return API_BASE;
+  });
 
   useEffect(() => {
     audioPeringatanRef.current = new Audio("/suara_ai.mp3");
@@ -60,13 +70,14 @@ export default function ModestDressCheck() {
     audioAmanRef.current = new Audio("/suara_aman.mp3");
     audioAmanRef.current.loop = false;
 
-    const savedUrl = localStorage.getItem("ISLAMIC_SMART_API_BASE");
-    if (savedUrl) {
-      setApiUrl(savedUrl);
-      setCustomUrlInput(savedUrl);
-    } else {
-      setCustomUrlInput(API_BASE);
-    }
+    return () => {
+      if (audioPeringatanRef.current) {
+        audioPeringatanRef.current.pause();
+      }
+      if (audioAmanRef.current) {
+        audioAmanRef.current.pause();
+      }
+    };
   }, []);
 
   const handleSaveApiUrl = (newUrl: string) => {
@@ -109,7 +120,7 @@ export default function ModestDressCheck() {
           videoRef.current.play();
           setIsCameraActive(true);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.warn("Target camera mode failed, trying fallback:", err);
         try {
           const fallbackStream = await navigator.mediaDevices.getUserMedia({
@@ -121,7 +132,7 @@ export default function ModestDressCheck() {
             videoRef.current.play();
             setIsCameraActive(true);
           }
-        } catch (fallbackErr: any) {
+        } catch (fallbackErr) {
           console.error("Camera access error:", fallbackErr);
           setCameraError("Kamera/CCTV tidak dapat diakses atau izin ditolak.");
           setIsCameraActive(false);
@@ -149,12 +160,15 @@ export default function ModestDressCheck() {
   };
 
   useEffect(() => {
-    startCamera();
-    setThreshold(mode === "PEREMPUAN" ? 2.0 : 3.5);
+    const timer = setTimeout(() => {
+      startCamera();
+      setThreshold(mode === "PEREMPUAN" ? 2.0 : 3.5);
+    }, 0);
     return () => {
+      clearTimeout(timer);
       stopCamera();
     };
-  }, [emergencyOff, mode]);
+  }, [emergencyOff, mode, startCamera]);
 
   const isProcessingRef = useRef(false);
   const lastTimeRef = useRef<number>(0);
