@@ -12,10 +12,11 @@ import {
   Power,
   LockKey,
   ArrowsClockwise,
-  Gear,
 } from "@phosphor-icons/react";
 import ThreeBackground from "../components/ThreeBackground";
 import ThreeRakaatVisualizer from "../components/ThreeRakaatVisualizer";
+import { FilesetResolver, PoseLandmarker, DrawingUtils } from "@mediapipe/tasks-vision";
+import { logRakaatSession } from "../../lib/supabase";
 
 interface RakaatResponse {
   session_id: string;
@@ -27,7 +28,8 @@ interface RakaatResponse {
   status_sekarang: string;
   visibilitas: number;
   message?: string;
-  annotated_image?: string;
+  sudut_pinggul?: number;
+  sudut_lutut?: number;
 }
 
 const PRAYERS = [
@@ -39,7 +41,130 @@ const PRAYERS = [
   { id: "SUNNAH", name: "Sunnah", rakaat: 2 },
 ];
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
+function hitungSudut(a: [number, number], b: [number, number], c: [number, number]): number {
+  const radians = Math.atan2(c[1] - b[1], c[0] - b[0]) - Math.atan2(a[1] - b[1], a[0] - b[0]);
+  let angle = Math.abs((radians * 180.0) / Math.PI);
+  return angle <= 180 ? angle : 360 - angle;
+}
+
+function getCoord(lm: { x: number; y: number }[], idx: number, w: number, h: number): [number, number] {
+  return [lm[idx].x * w, lm[idx].y * h];
+}
+
+function deteksiPosisi(
+  lm: { x: number; y: number }[],
+  w: number,
+  h: number
+): { status_raw: string; sudut_pinggul: number; sudut_lutut: number } {
+  const bahu_kiri = getCoord(lm, 11, w, h);
+  const bahu_kanan = getCoord(lm, 12, w, h);
+  const pinggul_kiri = getCoord(lm, 23, w, h);
+  const pinggul_kanan = getCoord(lm, 24, w, h);
+  const lutut_kiri = getCoord(lm, 25, w, h);
+  const lutut_kanan = getCoord(lm, 26, w, h);
+
+  const kepala_y = lm[0].y * h;
+  const pinggul_y = (pinggul_kiri[1] + pinggul_kanan[1]) / 2;
+
+  const sudut_pinggul =
+    (hitungSudut(bahu_kiri, pinggul_kiri, lutut_kiri) +
+      hitungSudut(bahu_kanan, pinggul_kanan, lutut_kanan)) /
+    2;
+  const sudut_lutut =
+    (hitungSudut(pinggul_kiri, lutut_kiri, getCoord(lm, 27, w, h)) +
+      hitungSudut(pinggul_kanan, lutut_kanan, getCoord(lm, 28, w, h))) /
+    2;
+
+  let status_raw = "BERDIRI";
+  if (kepala_y > pinggul_y + 10) {
+    status_raw = "SUJUD";
+  } else if (sudut_pinggul < 115 && kepala_y < pinggul_y) {
+    status_raw = "RUKU";
+  } else if (sudut_lutut < 125 && kepala_y < pinggul_y) {
+    status_raw = "DUDUK";
+  }
+
+  return { status_raw, sudut_pinggul, sudut_lutut };
+}
+
+function stepLabel(step: number): string {
+  const labels = ["Awal", "Ruku", "I'tidal", "Sujud1", "Duduk", "Sujud2", "Tahiyat"];
+  if (step >= 0 && step < labels.length) {
+    return labels[step];
+  }
+  return "Tahiyat Akhir";
+}
+
+class RakaatTracker {
+  session_id: string;
+  prayer_type: string;
+  max_rakaat: number;
+  rakaat_sekarang: number = 0;
+  step_gerakan: number = 0;
+  status_sekarang: string = "TIDAK TERDETEKSI";
+  status_sebelum: string = "";
+  riwayat_gerakan: string[] = [];
+  last_rakaat_time: number = 0;
+
+  constructor(session_id: string, prayer_type: string, max_rakaat: number) {
+    this.session_id = session_id;
+    this.prayer_type = prayer_type;
+    this.max_rakaat = max_rakaat;
+  }
+
+  updateState(status_raw: string): void {
+    this.riwayat_gerakan.push(status_raw);
+    if (this.riwayat_gerakan.length > 6) {
+      this.riwayat_gerakan.shift();
+    }
+
+    if (
+      this.riwayat_gerakan.length === 6 &&
+      this.riwayat_gerakan.every((g) => g === this.riwayat_gerakan[0])
+    ) {
+      this.status_sekarang = this.riwayat_gerakan[0];
+    } else {
+      return;
+    }
+
+    const waktu_sekarang = Date.now() / 1000;
+    const status_berubah = this.status_sekarang !== this.status_sebelum;
+    if (!status_berubah) return;
+
+    const step = this.step_gerakan;
+    if (this.status_sekarang === "RUKU" && step === 0) {
+      this.step_gerakan = 1;
+    } else if (this.status_sekarang === "BERDIRI" && step === 1) {
+      this.step_gerakan = 2;
+    } else if (this.status_sekarang === "SUJUD" && step === 2) {
+      this.step_gerakan = 3;
+    } else if (this.status_sekarang === "DUDUK" && step === 3) {
+      this.step_gerakan = 4;
+    } else if (this.status_sekarang === "SUJUD" && step === 4) {
+      this.step_gerakan = 5;
+    } else if (
+      (this.status_sekarang === "BERDIRI" || this.status_sekarang === "DUDUK") &&
+      step === 5
+    ) {
+      if (waktu_sekarang - this.last_rakaat_time >= 1.5) {
+        this.rakaat_sekarang += 1;
+        this.last_rakaat_time = waktu_sekarang;
+      }
+      this.step_gerakan = this.status_sekarang === "BERDIRI" ? 0 : -1;
+      if (this.step_gerakan === -1) {
+        logRakaatSession(
+          this.session_id,
+          this.prayer_type,
+          this.max_rakaat,
+          this.rakaat_sekarang,
+          this.rakaat_sekarang > this.max_rakaat
+        );
+      }
+    }
+
+    this.status_sebelum = this.status_sekarang;
+  }
+}
 
 export default function PrayerAssistant() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -47,41 +172,39 @@ export default function PrayerAssistant() {
 
   const [selectedPrayer, setSelectedPrayer] = useState(PRAYERS[0]);
   const [isCameraActive, setIsCameraActive] = useState(true);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [emergencyOff, setEmergencyOff] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<RakaatResponse | null>(null);
   const [fps, setFps] = useState<number>(0);
-  const [backendError, setBackendError] = useState(false);
+  const [landmarkerReady, setLandmarkerReady] = useState(false);
 
-  // API Base Configuration with localStorage support
-  const [apiUrl, setApiUrl] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("ISLAMIC_SMART_API_BASE") || API_BASE;
-    }
-    return API_BASE;
-  });
-  const [showApiModal, setShowApiModal] = useState<boolean>(false);
-  const [customUrlInput, setCustomUrlInput] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("ISLAMIC_SMART_API_BASE") || API_BASE;
-    }
-    return API_BASE;
-  });
+  const landmarkerRef = useRef<PoseLandmarker | null>(null);
+  const trackerRef = useRef<RakaatTracker | null>(null);
 
-  const handleSaveApiUrl = (newUrl: string) => {
-    const trimmed = newUrl.trim().replace(/\/+$/, "");
-    if (trimmed) {
-      localStorage.setItem("ISLAMIC_SMART_API_BASE", trimmed);
-      setApiUrl(trimmed);
-    } else {
-      localStorage.removeItem("ISLAMIC_SMART_API_BASE");
-      setApiUrl(API_BASE);
+  useEffect(() => {
+    async function initLandmarker() {
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+        const poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
+            delegate: "GPU",
+          },
+          runningMode: "VIDEO",
+          numPoses: 1,
+        });
+        landmarkerRef.current = poseLandmarker;
+        setLandmarkerReady(true);
+      } catch (err) {
+        console.error("Gagal inisialisasi PoseLandmarker:", err);
+      }
     }
-    setShowApiModal(false);
-    setBackendError(false);
-  };
+    initLandmarker();
+  }, []);
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -158,39 +281,19 @@ export default function PrayerAssistant() {
     };
   }, [emergencyOff, startCamera]);
 
-  const handleStartSession = async () => {
+  const handleStartSession = () => {
     if (emergencyOff) return;
     const newSessionId = `SESSION-${Date.now()}`;
     setSessionId(newSessionId);
-
-    try {
-      const res = await fetch(`${apiUrl}/detect/rakaat/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: newSessionId,
-          prayer_type: selectedPrayer.id,
-          max_rakaat: selectedPrayer.rakaat,
-        }),
-      });
-
-      if (res.ok) {
-        setIsSessionActive(true);
-        setBackendError(false);
-      } else {
-        setBackendError(true);
-      }
-    } catch (err) {
-      console.warn("Gagal terhubung ke backend sholat:", err);
-      setBackendError(true);
-      setIsSessionActive(false);
-    }
+    trackerRef.current = new RakaatTracker(newSessionId, selectedPrayer.id, selectedPrayer.rakaat);
+    setIsSessionActive(true);
   };
 
   const handleStopSession = () => {
     setIsSessionActive(false);
     setSessionId(null);
     setStatus(null);
+    trackerRef.current = null;
   };
 
   const isProcessingRef = useRef(false);
@@ -201,14 +304,29 @@ export default function PrayerAssistant() {
   }, []);
 
   const processFrame = useCallback(async () => {
-    if (emergencyOff || !isSessionActive || !sessionId || !videoRef.current || !canvasRef.current || isProcessingRef.current) return;
+    if (
+      emergencyOff ||
+      !isSessionActive ||
+      !sessionId ||
+      !videoRef.current ||
+      !canvasRef.current ||
+      isProcessingRef.current ||
+      !landmarkerRef.current ||
+      !trackerRef.current ||
+      videoRef.current.readyState < 2
+    ) {
+      return;
+    }
 
     isProcessingRef.current = true;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const w = video.videoWidth || 640;
+    const h = video.videoHeight || 480;
+
+    canvas.width = w;
+    canvas.height = h;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) {
@@ -216,50 +334,92 @@ export default function PrayerAssistant() {
       return;
     }
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const base64Image = canvas.toDataURL("image/jpeg", 0.4);
+    ctx.drawImage(video, 0, 0, w, h);
 
     try {
-      const res = await fetch(`${apiUrl}/detect/rakaat/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          image_base64: base64Image,
-        }),
-      });
+      const startTime = performance.now();
+      const landmarkerResult = landmarkerRef.current.detectForVideo(video, startTime);
 
-      if (res.ok) {
-        const data: RakaatResponse = await res.json();
-        setStatus(data);
-        setBackendError(false);
+      const tracker = trackerRef.current;
+      let visibilitas = 0;
+      let sudut_pinggul = 0;
+      let sudut_lutut = 0;
 
-        const now = Date.now();
-        const delta = (now - lastTimeRef.current) / 1000;
-        lastTimeRef.current = now;
-        if (delta > 0) {
-          setFps(Math.round(1 / delta));
+      if (landmarkerResult.landmarks && landmarkerResult.landmarks.length > 0) {
+        const lm = landmarkerResult.landmarks[0];
+        const idx_utama = [0, 11, 12, 23, 24, 25, 26, 27, 28];
+        const visibilities = idx_utama.map((i) => lm[i]?.visibility ?? 1);
+        visibilitas = visibilities.reduce((a, b) => a + b, 0) / idx_utama.length;
+
+        const pos = deteksiPosisi(lm, w, h);
+        sudut_pinggul = pos.sudut_pinggul;
+        sudut_lutut = pos.sudut_lutut;
+
+        tracker.updateState(pos.status_raw);
+
+        const drawingUtils = new DrawingUtils(ctx);
+        for (const landmark of landmarkerResult.landmarks) {
+          drawingUtils.drawLandmarks(landmark, {
+            color: "#00C8B4",
+            lineWidth: 2,
+            radius: 3,
+          });
+          drawingUtils.drawConnectors(landmark, PoseLandmarker.POSE_CONNECTIONS, {
+            color: "#C8C800",
+            lineWidth: 2,
+          });
         }
       } else {
-        setBackendError(true);
+        tracker.status_sekarang = "TIDAK TERDETEKSI";
+        tracker.riwayat_gerakan = [];
+      }
+
+      const exceeded = tracker.rakaat_sekarang > tracker.max_rakaat;
+      let message = "";
+      if (tracker.rakaat_sekarang === tracker.max_rakaat && tracker.step_gerakan === -1) {
+        message = "SHOLAT SEMPURNA";
+      } else if (exceeded) {
+        message = "RAKAAT MELEBIHI BATAS";
+      }
+
+      const resData: RakaatResponse = {
+        session_id: tracker.session_id,
+        prayer_type: tracker.prayer_type,
+        max_rakaat: tracker.max_rakaat,
+        detected_rakaat: tracker.rakaat_sekarang,
+        exceeded,
+        step_gerakan: stepLabel(tracker.step_gerakan),
+        status_sekarang: tracker.status_sekarang,
+        visibilitas: Number((visibilitas * 100).toFixed(1)),
+        message,
+        sudut_pinggul: Number(sudut_pinggul.toFixed(1)),
+        sudut_lutut: Number(sudut_lutut.toFixed(1)),
+      };
+
+      setStatus(resData);
+
+      const now = Date.now();
+      const delta = (now - lastTimeRef.current) / 1000;
+      lastTimeRef.current = now;
+      if (delta > 0) {
+        setFps(Math.round(1 / delta));
       }
     } catch (err) {
-      console.warn("Backend poll error:", err);
-      setBackendError(true);
+      console.error("Pose detection error:", err);
     } finally {
       isProcessingRef.current = false;
     }
-  }, [isSessionActive, sessionId, emergencyOff, apiUrl]);
+  }, [isSessionActive, sessionId, emergencyOff]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
-    if (isSessionActive && isCameraActive && !emergencyOff) {
+    if (isSessionActive && isCameraActive && !emergencyOff && landmarkerReady) {
       intervalId = setInterval(() => {
         processFrame();
-      }, 500);
+      }, 100);
     }
     return () => clearInterval(intervalId);
-  }, [isSessionActive, isCameraActive, emergencyOff, processFrame]);
+  }, [isSessionActive, isCameraActive, emergencyOff, landmarkerReady, processFrame]);
 
   return (
     <main className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between overflow-hidden selection:bg-emerald-100 bg-clean-grid">
@@ -301,7 +461,7 @@ export default function PrayerAssistant() {
             ))}
           </div>
 
-          {/* Camera & Server Controls */}
+          {/* Camera Controls */}
           <div className="flex items-center gap-2">
             <button
               onClick={toggleCameraFacing}
@@ -311,15 +471,6 @@ export default function PrayerAssistant() {
               <ArrowsClockwise size={14} className="text-emerald-600" />
               <span className="hidden sm:inline">Kamera:</span>
               <span className="font-semibold">{facingMode === "user" ? "Depan" : "Belakang"}</span>
-            </button>
-
-            <button
-              onClick={() => setShowApiModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 text-xs font-medium transition"
-              title="Atur Server Backend Deteksi"
-            >
-              <Gear size={14} className="text-slate-600" />
-              <span className="hidden md:inline">Server API</span>
             </button>
 
             <button
@@ -339,31 +490,8 @@ export default function PrayerAssistant() {
 
       {/* Main Content Area */}
       <section className="relative z-10 flex-1 max-w-7xl mx-auto w-full px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: CCTV Video Feed */}
+        {/* Left Column: CCTV Video Feed with Mobile 9:16 Support */}
         <div className="lg:col-span-8 flex flex-col gap-4">
-          {backendError && !emergencyOff && (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-wrap items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-3">
-                <Warning size={22} className="text-amber-600 shrink-0" />
-                <div>
-                  <p className="font-bold">Sensor Deteksi Sholat Terputus / Backend Offline</p>
-                  <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
-                    {typeof window !== "undefined" && window.location.protocol === "https:" && apiUrl.startsWith("http://")
-                      ? `Website disajikan via HTTPS (Vercel), sehingga browser memblokir koneksi HTTP ke ${apiUrl} (Mixed Content). Gunakan ngrok atau host backend di server HTTPS.`
-                      : `Gagal terhubung ke URL backend: ${apiUrl}. Pastikan server Python FastAPI berjalan.`}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowApiModal(true)}
-                className="px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-900 text-white font-semibold text-xs transition flex items-center gap-1.5 shrink-0"
-              >
-                <Gear size={14} />
-                <span>Atur URL Server API</span>
-              </button>
-            </div>
-          )}
-
           {emergencyOff && (
             <div className="p-4 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 text-xs flex items-center gap-3">
               <LockKey size={18} className="text-slate-600" />
@@ -373,9 +501,7 @@ export default function PrayerAssistant() {
             </div>
           )}
 
-          <div className="relative w-full rounded-2xl border border-slate-200 bg-slate-900 shadow-md overflow-hidden aspect-[16/9] flex items-center justify-center">
-            <canvas ref={canvasRef} className="hidden" />
-
+          <div className="relative w-full max-w-md mx-auto aspect-[9/16] rounded-2xl border border-slate-200 bg-slate-900 shadow-md overflow-hidden flex items-center justify-center">
             {/* HUD Top Bar */}
             <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 via-black/30 to-transparent p-4 z-20 flex items-center justify-between pointer-events-none text-xs font-mono">
               <div className="flex items-center gap-3 text-slate-300">
@@ -383,7 +509,6 @@ export default function PrayerAssistant() {
                   KIOSK SHOLAT #02
                 </span>
                 <span>SHOLAT: {selectedPrayer.name}</span>
-                <span className="text-slate-400 text-[11px]">[{facingMode === "user" ? "KAMERA DEPAN" : "KAMERA BELAKANG"}]</span>
               </div>
 
               {isSessionActive && !emergencyOff && (
@@ -393,22 +518,18 @@ export default function PrayerAssistant() {
               )}
             </div>
 
-            {/* Main Video Frame */}
-            <div className="relative w-full h-full flex items-center justify-center bg-slate-950 aspect-video lg:aspect-[16/9] w-full">
+            {/* Main Video Frame & Canvas Overlay */}
+            <div className="relative w-full h-full aspect-[9/16] flex items-center justify-center bg-slate-950">
               <video
                 ref={videoRef}
                 playsInline
                 muted
-                className="w-full h-full object-cover"
+                className="w-full h-full aspect-[9/16] object-cover"
               />
-
-              {status?.annotated_image && !emergencyOff && (
-                <img
-                  src={status.annotated_image}
-                  alt="Feed AI Rakaat Pose"
-                  className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
-                />
-              )}
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 w-full h-full aspect-[9/16] object-cover pointer-events-none z-10"
+              />
 
               {(!isCameraActive || emergencyOff) && (
                 <div className="p-8 text-center space-y-3 z-10 max-w-sm bg-white rounded-xl border border-slate-200 text-slate-900 shadow-sm">
@@ -508,62 +629,6 @@ export default function PrayerAssistant() {
           </div>
         </div>
       </section>
-
-      {/* Modal Settings Server API */}
-      {showApiModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl space-y-4 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold flex items-center gap-2 text-slate-900">
-                <Gear size={18} className="text-emerald-600" />
-                <span>Pengaturan Server Backend Deteksi</span>
-              </h3>
-              <button
-                onClick={() => setShowApiModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Fitur deteksi aurat &amp; rakaat sholat memerlukan server backend Python (FastAPI + MediaPipe).
-              Saat di-host di Firebase (HTTPS), browser memblokir koneksi HTTP ke <code>localhost</code>.
-            </p>
-
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-700 uppercase tracking-wide">
-                URL Backend Server (HTTPS / ngrok / Cloud)
-              </label>
-              <input
-                type="url"
-                value={customUrlInput}
-                onChange={(e) => setCustomUrlInput(e.target.value)}
-                placeholder="https://xxxx.ngrok-free.app atau https://api.domain.com"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-              />
-              <p className="text-[10px] text-slate-500">
-                Jalankan di terminal laptop Anda: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">ngrok http 8000</code> lalu salin URL HTTPS-nya di sini.
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button
-                onClick={() => handleSaveApiUrl("")}
-                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition"
-              >
-                Reset (Default)
-              </button>
-              <button
-                onClick={() => handleSaveApiUrl(customUrlInput)}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition"
-              >
-                Simpan URL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Footer */}
       <footer className="relative z-10 py-4 text-center text-xs text-slate-500 border-t border-slate-200 bg-white">

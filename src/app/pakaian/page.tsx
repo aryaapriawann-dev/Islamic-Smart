@@ -3,12 +3,9 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
-  ShieldCheck,
-  Camera,
   ArrowLeft,
   GenderFemale,
   GenderMale,
-  User,
   VideoCamera,
   Eye,
   CheckCircle,
@@ -16,9 +13,10 @@ import {
   Power,
   LockKey,
   ArrowsClockwise,
-  Gear,
 } from "@phosphor-icons/react";
 import ThreeBackground from "../components/ThreeBackground";
+import { FilesetResolver, PoseLandmarker, DrawingUtils } from "@mediapipe/tasks-vision";
+import { logAttireCheck } from "../../lib/supabase";
 
 interface AttireResponse {
   pose_detected: boolean;
@@ -27,10 +25,197 @@ interface AttireResponse {
   status: string;
   message?: string;
   threshold: number;
-  annotated_image?: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
+function maskKulit(imgData: ImageData): Uint8Array {
+  const data = imgData.data;
+  const len = data.length;
+  const skinMask = new Uint8Array(len / 4);
+
+  for (let i = 0; i < len; i += 4) {
+    const R = data[i];
+    const G = data[i + 1];
+    const B = data[i + 2];
+
+    const max = Math.max(R, G, B);
+    const min = Math.min(R, G, B);
+    const delta = max - min;
+
+    let H = 0;
+    if (delta !== 0) {
+      if (max === R) {
+        H = ((G - B) / delta) % 6;
+      } else if (max === G) {
+        H = (B - R) / delta + 2;
+      } else {
+        H = (R - G) / delta + 4;
+      }
+      H = Math.round(H * 60);
+      if (H < 0) H += 360;
+    }
+
+    const V = Math.round((max / 255) * 100);
+    const S = Math.round(max === 0 ? 0 : (delta / max) * 100);
+
+    const H_hsv = H / 2;
+    const S_hsv = Math.round((S / 100) * 255);
+    const V_hsv = Math.round((V / 100) * 255);
+
+    const Y = 0.299 * R + 0.587 * G + 0.114 * B;
+    const Cr = (R - Y) * 0.713 + 128;
+    const Cb = (B - Y) * 0.564 + 128;
+
+    const r_f = R + 1.0;
+    const g_f = G + 1.0;
+    const b_f = B + 1.0;
+    const ratio_rg = r_f / g_f;
+
+    const hsv_match = H_hsv >= 0 && H_hsv <= 22 && S_hsv >= 20 && S_hsv <= 180 && V_hsv >= 70 && V_hsv <= 255;
+    const ycrcb_match = Y >= 50 && Y <= 255 && Cr >= 133 && Cr <= 173 && Cb >= 77 && Cb <= 127;
+    const bgr_match = R > 75 && G > 35 && B > 20 && R > G && G > B && ratio_rg >= 1.05 && ratio_rg <= 1.80;
+
+    if (hsv_match && ycrcb_match && bgr_match) {
+      skinMask[i / 4] = 255;
+    }
+  }
+
+  return skinMask;
+}
+
+function createAuratMask(
+  mode: "PEREMPUAN" | "LAKI-LAKI",
+  landmarks: { x: number; y: number; visibility?: number }[],
+  w: number,
+  h: number
+): Uint8Array {
+  const auratMask = new Uint8Array(w * h);
+
+  const kordinat: Record<number, [number, number]> = {};
+  landmarks.forEach((lm, i) => {
+    if ((lm.visibility ?? 1) > 0.45) {
+      kordinat[i] = [Math.floor(lm.x * w), Math.floor(lm.y * h)];
+    }
+  });
+
+  if (mode === "LAKI-LAKI") {
+    let y_atas = 0;
+    let y_bawah = h;
+    let x_kiri = 0;
+    let x_kanan = w;
+
+    if (11 in kordinat && 12 in kordinat) {
+      const x_bahu_kiri = Math.min(kordinat[11][0], kordinat[12][0]);
+      const x_bahu_kanan = Math.max(kordinat[11][0], kordinat[12][0]);
+      const lebar_bahu = Math.max(40, x_bahu_kanan - x_bahu_kiri);
+      const cx_bahu = Math.floor((kordinat[11][0] + kordinat[12][0]) / 2);
+      const y_bahu = Math.floor((kordinat[11][1] + kordinat[12][1]) / 2);
+
+      if (23 in kordinat && 24 in kordinat) {
+        const y_pinggul = Math.floor((kordinat[23][1] + kordinat[24][1]) / 2);
+        const tinggi_torso = Math.max(30, y_pinggul - y_bahu);
+        const y_pusar = Math.floor(y_bahu + 0.45 * tinggi_torso);
+        const cx_pinggul = Math.floor((kordinat[23][0] + kordinat[24][0]) / 2);
+        const lebar_pinggul = Math.max(30, Math.abs(kordinat[23][0] - kordinat[24][0]));
+        const half_w = Math.floor(lebar_pinggul * 0.7);
+        x_kiri = Math.max(0, cx_pinggul - half_w);
+        x_kanan = Math.min(w, cx_pinggul + half_w);
+        y_atas = Math.max(0, y_pusar - 15);
+      } else {
+        const y_pusar = Math.floor(y_bahu + 0.55 * lebar_bahu);
+        const half_w = Math.floor(lebar_bahu * 0.35);
+        x_kiri = Math.max(0, cx_bahu - half_w);
+        x_kanan = Math.min(w, cx_bahu + half_w);
+        y_atas = Math.max(0, y_pusar - 15);
+      }
+    } else if (23 in kordinat && 24 in kordinat) {
+      const cx_pinggul = Math.floor((kordinat[23][0] + kordinat[24][0]) / 2);
+      const y_pinggul = Math.floor((kordinat[23][1] + kordinat[24][1]) / 2);
+      const lebar_pinggul = Math.max(30, Math.abs(kordinat[23][0] - kordinat[24][0]));
+      y_atas = Math.max(0, y_pinggul - 60);
+      const half_w = Math.floor(lebar_pinggul * 0.7);
+      x_kiri = Math.max(0, cx_pinggul - half_w);
+      x_kanan = Math.min(w, cx_pinggul + half_w);
+    }
+
+    if (25 in kordinat || 26 in kordinat) {
+      const lututY = [];
+      if (25 in kordinat) lututY.push(kordinat[25][1]);
+      if (26 in kordinat) lututY.push(kordinat[26][1]);
+      y_bawah = Math.min(h, Math.max(...lututY) + 30);
+    }
+
+    for (let y = y_atas; y < y_bawah; y++) {
+      for (let x = x_kiri; x < x_kanan; x++) {
+        if (x >= 0 && x < w && y >= 0 && y < h) {
+          auratMask[y * w + x] = 255;
+        }
+      }
+    }
+
+    const clearCircle = (cx: number, cy: number, r: number) => {
+      const r2 = r * r;
+      for (let y = Math.max(0, cy - r); y <= Math.min(h - 1, cy + r); y++) {
+        for (let x = Math.max(0, cx - r); x <= Math.min(w - 1, cx + r); x++) {
+          if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r2) {
+            auratMask[y * w + x] = 0;
+          }
+        }
+      }
+    };
+
+    [11, 12, 13, 14, 15, 16].forEach((idx) => {
+      if (idx in kordinat) clearCircle(kordinat[idx][0], kordinat[idx][1], 40);
+    });
+    for (let handIdx = 15; handIdx <= 22; handIdx++) {
+      if (handIdx in kordinat) clearCircle(kordinat[handIdx][0], kordinat[handIdx][1], 45);
+    }
+  } else {
+    auratMask.fill(255);
+
+    if (0 in kordinat) {
+      const [cx, cy] = kordinat[0];
+      let jarak_wajah = 70;
+      if (7 in kordinat && 8 in kordinat) {
+        jarak_wajah = Math.abs(kordinat[7][0] - kordinat[8][0]);
+      } else if (2 in kordinat && 5 in kordinat) {
+        jarak_wajah = Math.floor(Math.abs(kordinat[2][0] - kordinat[5][0]) * 2.2);
+      }
+      const rx = Math.max(50, Math.floor(jarak_wajah * 0.58));
+      const ry = Math.max(75, Math.floor(jarak_wajah * 0.95));
+
+      const rx2 = rx * rx;
+      const ry2 = ry * ry;
+      for (let y = Math.max(0, cy - ry); y <= Math.min(h - 1, cy + ry); y++) {
+        for (let x = Math.max(0, cx - rx); x <= Math.min(w - 1, cx + rx); x++) {
+          const dx = x - cx;
+          const dy = y - cy;
+          if ((dx * dx) / rx2 + (dy * dy) / ry2 <= 1) {
+            auratMask[y * w + x] = 0;
+          }
+        }
+      }
+    }
+
+    const clearCircle = (cx: number, cy: number, r: number) => {
+      const r2 = r * r;
+      for (let y = Math.max(0, cy - r); y <= Math.min(h - 1, cy + r); y++) {
+        for (let x = Math.max(0, cx - r); x <= Math.min(w - 1, cx + r); x++) {
+          if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r2) {
+            auratMask[y * w + x] = 0;
+          }
+        }
+      }
+    };
+
+    for (let handIdx = 15; handIdx <= 22; handIdx++) {
+      if (handIdx in kordinat) {
+        clearCircle(kordinat[handIdx][0], kordinat[handIdx][1], 40);
+      }
+    }
+  }
+
+  return auratMask;
+}
 
 export default function ModestDressCheck() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -41,28 +226,38 @@ export default function ModestDressCheck() {
 
   const [mode, setMode] = useState<"PEREMPUAN" | "LAKI-LAKI">("PEREMPUAN");
   const [isCameraActive, setIsCameraActive] = useState(true);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [emergencyOff, setEmergencyOff] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [result, setResult] = useState<AttireResponse | null>(null);
-  const [backendError, setBackendError] = useState(false);
   const [threshold, setThreshold] = useState<number>(2.0);
   const [fps, setFps] = useState<number>(0);
+  const [landmarkerReady, setLandmarkerReady] = useState(false);
 
-  // API Base Configuration with localStorage support
-  const [apiUrl, setApiUrl] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("ISLAMIC_SMART_API_BASE") || API_BASE;
+  const landmarkerRef = useRef<PoseLandmarker | null>(null);
+
+  useEffect(() => {
+    async function initLandmarker() {
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+        const poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
+            delegate: "GPU",
+          },
+          runningMode: "VIDEO",
+          numPoses: 1,
+        });
+        landmarkerRef.current = poseLandmarker;
+        setLandmarkerReady(true);
+      } catch (err) {
+        console.error("Gagal inisialisasi PoseLandmarker:", err);
+      }
     }
-    return API_BASE;
-  });
-  const [showApiModal, setShowApiModal] = useState<boolean>(false);
-  const [customUrlInput, setCustomUrlInput] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("ISLAMIC_SMART_API_BASE") || API_BASE;
-    }
-    return API_BASE;
-  });
+    initLandmarker();
+  }, []);
 
   useEffect(() => {
     audioPeringatanRef.current = new Audio("/suara_ai.mp3");
@@ -79,19 +274,6 @@ export default function ModestDressCheck() {
       }
     };
   }, []);
-
-  const handleSaveApiUrl = (newUrl: string) => {
-    const trimmed = newUrl.trim().replace(/\/+$/, "");
-    if (trimmed) {
-      localStorage.setItem("ISLAMIC_SMART_API_BASE", trimmed);
-      setApiUrl(trimmed);
-    } else {
-      localStorage.removeItem("ISLAMIC_SMART_API_BASE");
-      setApiUrl(API_BASE);
-    }
-    setShowApiModal(false);
-    setBackendError(false);
-  };
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -172,20 +354,34 @@ export default function ModestDressCheck() {
 
   const isProcessingRef = useRef(false);
   const lastTimeRef = useRef<number>(0);
+  const lastLogTimeRef = useRef<number>(0);
 
   useEffect(() => {
     lastTimeRef.current = Date.now();
   }, []);
 
   const captureAndAnalyze = useCallback(async () => {
-    if (emergencyOff || !videoRef.current || !canvasRef.current || !isCameraActive || isProcessingRef.current) return;
+    if (
+      emergencyOff ||
+      !videoRef.current ||
+      !canvasRef.current ||
+      !isCameraActive ||
+      isProcessingRef.current ||
+      !landmarkerRef.current ||
+      videoRef.current.readyState < 2
+    ) {
+      return;
+    }
 
     isProcessingRef.current = true;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const w = video.videoWidth || 640;
+    const h = video.videoHeight || 480;
+
+    canvas.width = w;
+    canvas.height = h;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) {
@@ -193,84 +389,149 @@ export default function ModestDressCheck() {
       return;
     }
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const base64Image = canvas.toDataURL("image/jpeg", 0.4);
+    ctx.drawImage(video, 0, 0, w, h);
 
     try {
-      const res = await fetch(`${apiUrl}/detect/attire`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_base64: base64Image,
-          mode: mode,
-          threshold: threshold,
-        }),
-      });
+      const startTime = performance.now();
+      const landmarkerResult = landmarkerRef.current.detectForVideo(video, startTime);
 
-      if (res.ok) {
-        const data: AttireResponse = await res.json();
-        setResult(data);
-        setBackendError(false);
+      let pose_detected = false;
+      let pelanggaran = false;
+      let persen_aurat = 0.0;
 
-        if (data.pose_detected) {
-          if (data.pelanggaran) {
-            if (lastAudioStateRef.current !== "PERINGATAN") {
-              if (audioAmanRef.current) {
-                audioAmanRef.current.pause();
-                audioAmanRef.current.currentTime = 0;
+      if (landmarkerResult.landmarks && landmarkerResult.landmarks.length > 0) {
+        const lm = landmarkerResult.landmarks[0];
+        const fitur_wajah = [0, 1, 2, 4, 5, 7, 8].map((i) => (lm[i]?.visibility ?? 1) > 0.6);
+        const wajah_valid = fitur_wajah.filter(Boolean).length >= 2;
+        const bahu_valid = (lm[11]?.visibility ?? 1) > 0.55 || (lm[12]?.visibility ?? 1) > 0.55;
+
+        if (wajah_valid && bahu_valid) {
+          pose_detected = true;
+
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const skinMask = maskKulit(imgData);
+          const auratMask = createAuratMask(mode, lm, w, h);
+
+          let pixel_kulit = 0;
+          let total_pixel_aurat = 0;
+          const totalPixels = w * h;
+
+          for (let i = 0; i < totalPixels; i++) {
+            if (auratMask[i] > 0) {
+              total_pixel_aurat++;
+              if (skinMask[i] > 0) {
+                pixel_kulit++;
               }
-              if (audioPeringatanRef.current) {
-                audioPeringatanRef.current.play().catch(() => {});
-              }
-              lastAudioStateRef.current = "PERINGATAN";
-            }
-          } else {
-            if (lastAudioStateRef.current !== "AMAN") {
-              if (audioPeringatanRef.current) {
-                audioPeringatanRef.current.pause();
-                audioPeringatanRef.current.currentTime = 0;
-              }
-              if (audioAmanRef.current) {
-                audioAmanRef.current.play().catch(() => {});
-              }
-              lastAudioStateRef.current = "AMAN";
             }
           }
+
+          persen_aurat = total_pixel_aurat > 0 ? (pixel_kulit / total_pixel_aurat) * 100 : 0.0;
+          const th = threshold;
+          pelanggaran = persen_aurat > th;
+
+          const drawingUtils = new DrawingUtils(ctx);
+          for (const landmark of landmarkerResult.landmarks) {
+            drawingUtils.drawLandmarks(landmark, {
+              color: "#00C8B4",
+              lineWidth: 2,
+              radius: 3,
+            });
+            drawingUtils.drawConnectors(landmark, PoseLandmarker.POSE_CONNECTIONS, {
+              color: "#C8C800",
+              lineWidth: 2,
+            });
+          }
+        }
+      }
+
+      let statusStr = "MENUNGGU";
+      let messageStr = "Silakan berdiri di depan kiosk untuk mengecek kesesuaian pakaian.";
+
+      if (pose_detected) {
+        if (pelanggaran) {
+          statusStr = "PENGINGAT_SOPAN";
+          messageStr = "Yuk, rapikan dan sesuaikan pakaian sebelum masuk area ibadah.";
         } else {
-          if (lastAudioStateRef.current !== "IDLE") {
+          statusStr = "RAPI";
+          messageStr = "Alhamdulillah, pakaian sudah rapi dan menutup aurat dengan baik.";
+        }
+      }
+
+      const resData: AttireResponse = {
+        pose_detected,
+        pelanggaran,
+        persen_aurat: Number(persen_aurat.toFixed(2)),
+        status: statusStr,
+        message: messageStr,
+        threshold,
+      };
+
+      setResult(resData);
+
+      if (pose_detected) {
+        const nowSec = Date.now();
+        if (nowSec - lastLogTimeRef.current > 5000) {
+          lastLogTimeRef.current = nowSec;
+          logAttireCheck(statusStr, resData.persen_aurat, mode);
+        }
+      }
+
+      if (pose_detected) {
+        if (pelanggaran) {
+          if (lastAudioStateRef.current !== "PERINGATAN") {
+            if (audioAmanRef.current) {
+              audioAmanRef.current.pause();
+              audioAmanRef.current.currentTime = 0;
+            }
+            if (audioPeringatanRef.current) {
+              audioPeringatanRef.current.play().catch(() => {});
+            }
+            lastAudioStateRef.current = "PERINGATAN";
+          }
+        } else {
+          if (lastAudioStateRef.current !== "AMAN") {
             if (audioPeringatanRef.current) {
               audioPeringatanRef.current.pause();
               audioPeringatanRef.current.currentTime = 0;
             }
-            lastAudioStateRef.current = "IDLE";
+            if (audioAmanRef.current) {
+              audioAmanRef.current.play().catch(() => {});
+            }
+            lastAudioStateRef.current = "AMAN";
           }
         }
-
-        const now = Date.now();
-        const delta = (now - lastTimeRef.current) / 1000;
-        lastTimeRef.current = now;
-        if (delta > 0) {
-          setFps(Math.round(1 / delta));
-        }
       } else {
-        setBackendError(true);
+        if (lastAudioStateRef.current !== "IDLE") {
+          if (audioPeringatanRef.current) {
+            audioPeringatanRef.current.pause();
+            audioPeringatanRef.current.currentTime = 0;
+          }
+          lastAudioStateRef.current = "IDLE";
+        }
+      }
+
+      const now = Date.now();
+      const delta = (now - lastTimeRef.current) / 1000;
+      lastTimeRef.current = now;
+      if (delta > 0) {
+        setFps(Math.round(1 / delta));
       }
     } catch (err) {
-      setBackendError(true);
+      console.error("Frame analysis error:", err);
     } finally {
       isProcessingRef.current = false;
     }
-  }, [isCameraActive, mode, threshold, emergencyOff, apiUrl]);
+  }, [isCameraActive, mode, threshold, emergencyOff]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
-    if (isCameraActive && !emergencyOff) {
+    if (isCameraActive && !emergencyOff && landmarkerReady) {
       intervalId = setInterval(() => {
         captureAndAnalyze();
-      }, 500);
+      }, 100);
     }
     return () => clearInterval(intervalId);
-  }, [isCameraActive, emergencyOff, captureAndAnalyze]);
+  }, [isCameraActive, emergencyOff, landmarkerReady, captureAndAnalyze]);
 
   return (
     <main className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between overflow-hidden selection:bg-emerald-100 bg-clean-grid">
@@ -292,7 +553,7 @@ export default function ModestDressCheck() {
                 Islamic Smart
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono border border-slate-200 font-medium">
-                Deteksi Aurat
+                Deteksi Aurat Client-Side
               </span>
             </div>
           </div>
@@ -323,7 +584,7 @@ export default function ModestDressCheck() {
             </button>
           </div>
 
-          {/* Controls: Camera Switch & Emergency Off & API Settings */}
+          {/* Controls: Camera Switch & Emergency Off */}
           <div className="flex items-center gap-2">
             <button
               onClick={toggleCameraFacing}
@@ -333,15 +594,6 @@ export default function ModestDressCheck() {
               <ArrowsClockwise size={14} className="text-emerald-600" />
               <span className="hidden sm:inline">Kamera:</span>
               <span className="font-semibold">{facingMode === "user" ? "Depan" : "Belakang"}</span>
-            </button>
-
-            <button
-              onClick={() => setShowApiModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 text-xs font-medium transition"
-              title="Atur Server Backend Deteksi"
-            >
-              <Gear size={14} className="text-slate-600" />
-              <span className="hidden md:inline">Server API</span>
             </button>
 
             <button
@@ -361,30 +613,6 @@ export default function ModestDressCheck() {
 
       {/* Main Content */}
       <section className="relative z-10 flex-1 max-w-7xl mx-auto w-full px-6 py-6 flex flex-col gap-6">
-        {/* Backend Warning / Information Banner */}
-        {backendError && !emergencyOff && (
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-wrap items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3">
-              <Warning size={22} className="text-amber-600 shrink-0" />
-              <div>
-                <p className="font-bold">Sensor Deteksi Backend Terputus / Tidak Terjangkau</p>
-                <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
-                  {typeof window !== "undefined" && window.location.protocol === "https:" && apiUrl.startsWith("http://")
-                    ? `Situs disajikan via HTTPS (Vercel), sehingga browser memblokir koneksi HTTP ke ${apiUrl} (Mixed Content). Gunakan ngrok atau host backend di server HTTPS.`
-                    : `Gagal terhubung ke URL backend: ${apiUrl}. Pastikan server Python FastAPI (MediaPipe) sedang berjalan.`}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowApiModal(true)}
-              className="px-3.5 py-2 rounded-lg bg-amber-800 hover:bg-amber-900 text-white font-semibold text-xs transition flex items-center gap-1.5 shrink-0"
-            >
-              <Gear size={14} />
-              <span>Atur URL Backend Server</span>
-            </button>
-          </div>
-        )}
-
         {/* Graceful Degradation Banner if Emergency Off */}
         {emergencyOff && (
           <div className="p-4 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 text-xs flex items-center justify-between">
@@ -400,10 +628,8 @@ export default function ModestDressCheck() {
           </div>
         )}
 
-        {/* Full-Scale CCTV Screen Frame */}
-        <div className="relative w-full rounded-2xl border border-slate-200 bg-slate-900 shadow-md overflow-hidden aspect-[16/9] md:aspect-[16/8] flex items-center justify-center">
-          <canvas ref={canvasRef} className="hidden" />
-
+        {/* Full-Scale CCTV Screen Frame Mobile 9:16 aspect ratio */}
+        <div className="relative w-full max-w-md mx-auto aspect-[9/16] rounded-2xl border border-slate-200 bg-slate-900 shadow-md overflow-hidden flex items-center justify-center">
           {/* HUD Top Bar */}
           <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 via-black/30 to-transparent p-4 z-20 flex items-center justify-between pointer-events-none text-xs font-mono">
             <div className="flex items-center gap-3">
@@ -412,13 +638,12 @@ export default function ModestDressCheck() {
                 MONITOR KIOSK #01
               </span>
               <span className="text-slate-300">MODE: {mode}</span>
-              <span className="text-slate-400 text-[11px]">[{facingMode === "user" ? "KAMERA DEPAN" : "KAMERA BELAKANG"}]</span>
             </div>
 
             <div className="flex items-center gap-4 text-slate-300">
-              <span className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 hidden sm:inline-flex">
                 <Eye size={14} className="text-emerald-400" />
-                PRIVACY-FIRST CV ENGINE
+                CLIENT CV ENGINE
               </span>
               {isCameraActive && !emergencyOff && (
                 <span className="bg-slate-800 px-2.5 py-1 rounded border border-slate-700 text-white font-bold">
@@ -428,22 +653,20 @@ export default function ModestDressCheck() {
             </div>
           </div>
 
-          {/* Video Stream & Realtime Overlay */}
-          <div className="relative w-full h-full flex items-center justify-center bg-slate-950">
+          {/* Video Stream & Realtime Canvas Overlay */}
+          <div className="relative w-full h-full aspect-[9/16] flex items-center justify-center bg-slate-950">
             <video
               ref={videoRef}
               playsInline
               muted
-              className={`w-full h-full object-contain ${!isCameraActive || emergencyOff ? "hidden" : ""}`}
+              className={`w-full h-full aspect-[9/16] object-cover ${!isCameraActive || emergencyOff ? "hidden" : ""}`}
             />
-
-            {result?.annotated_image && !emergencyOff && (
-              <img
-                src={result.annotated_image}
-                alt="Feed AI Pose Overlay"
-                className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10"
-              />
-            )}
+            <canvas
+              ref={canvasRef}
+              className={`absolute inset-0 w-full h-full aspect-[9/16] object-cover pointer-events-none z-10 ${
+                !isCameraActive || emergencyOff ? "hidden" : ""
+              }`}
+            />
 
             {(!isCameraActive || emergencyOff) && (
               <div className="p-8 text-center space-y-4 z-10 max-w-sm bg-white rounded-xl border border-slate-200 shadow-sm text-slate-900">
@@ -512,62 +735,6 @@ export default function ModestDressCheck() {
           )}
         </div>
       </section>
-
-      {/* Modal Settings Server API */}
-      {showApiModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl space-y-4 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold flex items-center gap-2 text-slate-900">
-                <Gear size={18} className="text-emerald-600" />
-                <span>Pengaturan Server Backend Deteksi</span>
-              </h3>
-              <button
-                onClick={() => setShowApiModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Fitur deteksi aurat &amp; rakaat sholat memerlukan server backend Python (FastAPI + MediaPipe) yang berjalan di komputer lokal atau server terpisah.
-              Saat website di-host di Vercel (HTTPS), browser memblokir koneksi HTTP ke <code>localhost</code>. Gunakan ngrok untuk membuat tunnel HTTPS.
-            </p>
-
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-700 uppercase tracking-wide">
-                URL Backend Server (HTTPS / ngrok / Cloud)
-              </label>
-              <input
-                type="url"
-                value={customUrlInput}
-                onChange={(e) => setCustomUrlInput(e.target.value)}
-                placeholder="https://xxxx.ngrok-free.app atau https://api.domain.com"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-              />
-              <p className="text-[10px] text-slate-500">
-                Jalankan di terminal laptop Anda: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">ngrok http 8000</code> lalu salin URL HTTPS-nya di sini.
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button
-                onClick={() => handleSaveApiUrl("")}
-                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition"
-              >
-                Reset (Default)
-              </button>
-              <button
-                onClick={() => handleSaveApiUrl(customUrlInput)}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition"
-              >
-                Simpan URL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Footer */}
       <footer className="relative z-10 py-4 text-center text-xs text-slate-500 border-t border-slate-200 bg-white">
