@@ -1,5 +1,8 @@
 {
   "dependencies": {
     "firebase": "^12.17.1"
+  },
+  "devDependencies": {
+    "@types/estree": "^1.0.9"
   }
 }
