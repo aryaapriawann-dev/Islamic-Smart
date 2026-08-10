@@ -16,7 +16,7 @@ interface VisitorSummary {
   prayer_breakdown: { [key: string]: number };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
 
 export default function VisitorStatistics() {
   const [summary, setSummary] = useState<VisitorSummary>({

@@ -39,7 +39,7 @@ const PRAYERS = [
   { id: "SUNNAH", name: "Sunnah", rakaat: 2 },
 ];
 
-const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
 
 export default function PrayerAssistant() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
