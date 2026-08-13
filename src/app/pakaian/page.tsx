@@ -233,6 +233,7 @@ export default function ModestDressCheck() {
   const [threshold, setThreshold] = useState<number>(2.0);
   const [fps, setFps] = useState<number>(0);
   const [landmarkerReady, setLandmarkerReady] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
 
@@ -477,7 +478,7 @@ export default function ModestDressCheck() {
         }
       }
 
-      if (pose_detected) {
+      if (pose_detected && audioEnabled) {
         if (pelanggaran) {
           if (lastAudioStateRef.current !== "PERINGATAN") {
             if (audioAmanRef.current) {
@@ -587,6 +588,18 @@ export default function ModestDressCheck() {
 
           {/* Controls: Camera Switch & Emergency Off */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAudioEnabled(!audioEnabled)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                audioEnabled
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+              title="Aktifkan Audio Panduan"
+            >
+              <span>{audioEnabled ? "🔊 Suara Aktif" : "🔇 Suara Mati"}</span>
+            </button>
+
             <button
               onClick={toggleCameraFacing}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 text-xs font-medium transition"

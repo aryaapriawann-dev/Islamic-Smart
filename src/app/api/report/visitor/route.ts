@@ -42,8 +42,8 @@ export async function POST(request: Request) {
       const { data } = await supabase
         .from("visitor_counts")
         .select("timestamp, count, prayer_time_label")
-        .gte("timestamp", `${startDate}T00:00:00Z`)
-        .lte("timestamp", `${endDate}T23:59:59Z`)
+        .gte("timestamp", `${startDate}T00:00:00.000Z`)
+        .lte("timestamp", `${endDate}T23:59:59.999Z`)
         .order("timestamp", { ascending: true });
 
       if (data && data.length > 0) {

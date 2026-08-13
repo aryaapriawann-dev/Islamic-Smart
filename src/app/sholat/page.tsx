@@ -146,7 +146,7 @@ class RakaatTracker {
       (this.status_sekarang === "BERDIRI" || this.status_sekarang === "DUDUK") &&
       step === 5
     ) {
-      if (waktu_sekarang - this.last_rakaat_time >= 1.5) {
+      if (waktu_sekarang - this.last_rakaat_time >= 3.0) {
         this.rakaat_sekarang += 1;
         this.last_rakaat_time = waktu_sekarang;
       }
